@@ -76,6 +76,27 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
   - `ui.rs`: Pure functional rendering logic.
   - `events.rs`: Blocking input listener thread.
 
+## Roadmap
+
+### Providers
+- [ ] YouTube Music support
+- [ ] Spotify support
+- [ ] SoundCloud support
+- [ ] Provider authentication support
+
+### Playback
+- [ ] Volume control
+- [ ] Seek forward / backward within a track
+- [ ] Play an album entirely (auto-advance through tracks)
+- [ ] "Now Playing" view — show the current context (queue, album, or single track)
+- [ ] System notifications on track change
+
+### Queues & Persistence
+- [ ] Queue support — custom queues mixing tracks from multiple providers
+- [ ] Add track to queue or current playing list
+- [ ] Save queues to a local database
+- [ ] Save album / track ID information to a local database
+
 ## License
 
 MIT
