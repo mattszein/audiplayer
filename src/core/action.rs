@@ -1,0 +1,101 @@
+use std::time::Duration;
+use crossterm::event::KeyEvent;
+use crate::core::Mode;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ResultType {
+    Track,
+    Album,
+}
+
+#[derive(Debug, Clone)]
+pub enum Action {
+    // ── User intent ──────────────────────────────────────────────
+    Search { provider: String, query: String },
+    Play(Track),
+    Pause,
+    Resume,
+    PlayPause,
+    PlaySelected,
+    Skip,
+    SeekTo(Duration),
+    EnqueueTrack(Track),
+    SwitchProvider(String),
+    SetMode(Mode),
+
+    // ── Focus & UI Navigation ─────────────────────────────────────
+    FocusPlayer,
+    FocusSearch,
+    FocusLogs,
+    ToggleLogs,
+    Log(String),
+    SearchInput(char),
+    SearchBackspace,
+    SearchSubmit,
+    CursorDown,
+    CursorUp,
+
+    // ── Command Line ──────────────────────────────────────────────
+    CommandInput(char),
+    CommandBackspace,
+    CommandExecute,
+
+    // ── Resolve Stream URL ────────────────────────────────────────
+    ResolveStreamUrl(Track),
+
+    // ── Input ─────────────────────────────────────────────────────
+    Key(KeyEvent),
+
+    // ── Player feedback ───────────────────────────────────────────
+    PlayerEvent(PlayerEvent),
+    MpvStdout(String),
+
+    // ── Plugin responses ──────────────────────────────────────────
+    PluginResponse { id: String, result: PluginResult },
+
+    // ── App lifecycle ─────────────────────────────────────────────
+    Quit,
+    Tick,
+    Resize(u16, u16),
+}
+
+#[derive(Debug, Clone)]
+pub struct Track {
+    pub id: String,
+    pub title: String,
+    pub artist: String,
+    pub album: Option<String>,
+    pub url: String,
+    pub stream_url: Option<String>,
+    pub provider: String,
+    pub duration: Option<Duration>,
+    pub bitrate: Option<u32>, // in kbps
+    pub result_type: ResultType,
+}
+
+#[derive(Debug, Clone)]
+pub enum PlayerEvent {
+    TrackEnded,
+    PositionChanged {
+        position: Duration,
+        duration: Duration,
+        percent: u8,
+    },
+    Stopped,
+    MetadataLoaded {
+        title: Option<String>,
+        artist: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum PluginResult {
+    Search(Vec<Track>),
+    StreamUrl { 
+        track_id: String, 
+        url: String,
+        duration: Option<Duration>,
+        bitrate: Option<u32>,
+    },
+    Error(String),
+}
