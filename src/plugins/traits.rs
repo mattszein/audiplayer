@@ -16,5 +16,6 @@ pub trait Provider: Send + Sync {
     fn capabilities(&self) -> Vec<Capability>;
 
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<Track>>;
-    async fn get_stream_url(&self, track_id: &str) -> Result<String>;
+    async fn get_stream_url(&self, track: &Track) -> Result<String>;
+    async fn get_album_tracks(&self, _track: &Track) -> Result<Vec<Track>> { Ok(vec![]) }
 }

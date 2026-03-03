@@ -13,11 +13,17 @@ The project follows a micro architecture where the core orchestrates communicati
 ## Features
 
 - **Agnostic Provider System**: Easily switch between Bandcamp and YouTube using tabs.
+- **Advanced Navigation**: 
+  - Search for albums, tracks, or artists.
+  - **Drill-down**: Press Enter on an album to view its tracklist, and press Backspace to return to your previous search.
+- **Provider-Specific Integrations**:
+  - **Bandcamp**: Uses native API for ultra-fast search and stream resolution without external dependencies. Supports search filters (`@album`, `@track`, `@artist`).
+  - **YouTube**: Powered by `yt-dlp` for discovery and high-quality stream extraction.
 - **Vim-like Experience**:
   - Modes: `NORMAL`, `INSERT` (search), `COMMAND` (colon commands).
-  - Navigation: `hjkl` for lists, `gg`/`G` for top/bottom, `Ctrl+h/l` for panel focus.
+  - Navigation: `hjkl` / arrow keys for lists, `gg`/`G` for top/bottom, `Ctrl+h/l` or arrow keys for panel focus.
 - **Performance Optimized**:
-  - Background pre-fetching of stream URLs using `yt-dlp` while scrolling.
+  - Background pre-fetching of stream URLs while scrolling.
   - Concurrency control via Semaphores to prevent rate-limiting (429 errors).
 - **Audio Engine**:
   - Uses a persistent `mpv` instance controlled via IPC sockets.
@@ -37,18 +43,41 @@ The project follows a micro architecture where the core orchestrates communicati
   - `mpv.rs`: Concrete implementation using a headless `mpv` process.
 - `src/plugins/`: Content provider bridges.
   - `traits.rs`: The contract every provider must implement.
-  - `bandcamp.rs`: Bandcamp bridge using autocomplete API.
+  - `bandcamp.rs`: Bandcamp bridge using native API for search and streaming.
   - `youtube.rs`: YouTube bridge using `yt-dlp` discovery.
 - `src/tui/`: Terminal User Interface.
   - `ui.rs`: Pure functional rendering logic.
   - `events.rs`: Blocking input listener thread.
 
+## Requirements
+
+- **Rust** (edition 2024)
+- **mpv** — headless audio engine (controlled via IPC socket)
+- **yt-dlp** — stream URL resolution and YouTube search (required for YouTube provider)
+
 ## Installation & Usage
 
-1. Ensure `mpv` and `yt-dlp` are installed on your system.
-2. Run with `cargo run`.
-3. Commands:
-    - `:q` to quit.
-    - `:l` to toggle logs.
-    - `i` to enter search mode.
-    - `Tab` to switch providers.
+1. Ensure `mpv` and `yt-dlp` are installed and available in `$PATH`.
+2. Build with `cargo build --release` or run directly with `cargo run`.
+3. Keybindings:
+
+| Key | Mode | Action |
+|-----|------|--------|
+| `i` | Normal | Enter search (Insert) mode |
+| `Esc` | Insert/Command | Return to Normal mode |
+| `Enter` | Insert | Submit search |
+| `Enter` | Normal | Play track / View album tracks |
+| `Backspace` | Normal | Go back (e.g., from album to search) |
+| `Space` | Normal | Play/Pause toggle |
+| `j` / `k` / arrows | Normal | Navigate results |
+| `gg` / `G` | Normal | Jump to first / last result |
+| `Tab` / `Shift+Tab` | Normal | Cycle providers |
+| `1` / `2` | Normal | Switch to Bandcamp / YouTube directly |
+| `Ctrl+h` / `Ctrl+l` | Normal | Focus search / logs panel |
+| `:q` | Command | Quit (or close logs if focused) |
+| `:l` | Command | Toggle log panel |
+| `Ctrl+c` | Any | Force quit |
+
+## License
+
+MIT

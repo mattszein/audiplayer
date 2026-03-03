@@ -56,6 +56,8 @@ impl Provider for YouTubeProvider {
                         title,
                         artist: uploader,
                         album: None,
+                        artist_id: None,
+                        album_id: None,
                         url,
                         stream_url: None,
                         provider: "youtube".to_string(),
@@ -70,5 +72,5 @@ impl Provider for YouTubeProvider {
         Ok(tracks)
     }
 
-    async fn get_stream_url(&self, _track_id: &str) -> Result<String> { Ok(String::new()) }
+    async fn get_stream_url(&self, _track: &Track) -> Result<String> { Ok(String::new()) }
 }
