@@ -4,16 +4,43 @@ An agnostic, modular Terminal User Interface (TUI) media player written in Rust.
 
 ## Overview
 
+Hey, I'm Matt — this is my first vibe-coded app, born from late-night terminal sessions and a love for music. I built it to scratch my own itch and now I'm sharing it with the world.
+
 Audiplayer is a provider-agnostic music player TUI that decouples the user interface from the audio engine and the content providers. It uses **Ratatui** for a performant, Vim-like terminal interface, **mpv** as a headless audio engine, and a modular plugin system to fetch metadata and streams from various sources like YouTube and Bandcamp.
 
-## Summary
+## Requirements
 
-The project follows a micro architecture where the core orchestrates communication between the TUI, the audio player, and the plugins. Everything flows through a single `Action` language, making the state predictable and easy to reason about.
+- **Rust** (edition 2024)
+- **mpv** — headless audio engine (controlled via IPC socket)
+- **yt-dlp** — stream URL resolution and YouTube search (required for YouTube provider)
+
+## Installation & Usage
+
+1. Ensure `mpv` and `yt-dlp` are installed and available in `$PATH`.
+2. Build with `cargo build --release` or run directly with `cargo run`.
+3. Keybindings:
+
+| Key | Mode | Action |
+|-----|------|--------|
+| `i` | Normal | Enter search (Insert) mode |
+| `Esc` | Insert/Command | Return to Normal mode |
+| `Enter` | Insert | Submit search |
+| `Enter` | Normal | Play track / View album tracks |
+| `Backspace` | Normal | Go back (e.g., from album to search) |
+| `Space` | Normal | Play/Pause toggle |
+| `j` / `k` / arrows | Normal | Navigate results |
+| `gg` / `G` | Normal | Jump to first / last result |
+| `Tab` / `Shift+Tab` | Normal | Cycle providers |
+| `1` / `2` | Normal | Switch to Bandcamp / YouTube directly |
+| `Ctrl+h` / `Ctrl+l` | Normal | Focus search / logs panel |
+| `:q` | Command | Quit (or close logs if focused) |
+| `:l` | Command | Toggle log panel |
+| `Ctrl+c` | Any | Force quit |
 
 ## Features
 
 - **Agnostic Provider System**: Easily switch between Bandcamp and YouTube using tabs.
-- **Advanced Navigation**: 
+- **Advanced Navigation**:
   - Search for albums, tracks, or artists.
   - **Drill-down**: Press Enter on an album to view its tracklist, and press Backspace to return to your previous search.
 - **Provider-Specific Integrations**:
@@ -48,35 +75,6 @@ The project follows a micro architecture where the core orchestrates communicati
 - `src/tui/`: Terminal User Interface.
   - `ui.rs`: Pure functional rendering logic.
   - `events.rs`: Blocking input listener thread.
-
-## Requirements
-
-- **Rust** (edition 2024)
-- **mpv** — headless audio engine (controlled via IPC socket)
-- **yt-dlp** — stream URL resolution and YouTube search (required for YouTube provider)
-
-## Installation & Usage
-
-1. Ensure `mpv` and `yt-dlp` are installed and available in `$PATH`.
-2. Build with `cargo build --release` or run directly with `cargo run`.
-3. Keybindings:
-
-| Key | Mode | Action |
-|-----|------|--------|
-| `i` | Normal | Enter search (Insert) mode |
-| `Esc` | Insert/Command | Return to Normal mode |
-| `Enter` | Insert | Submit search |
-| `Enter` | Normal | Play track / View album tracks |
-| `Backspace` | Normal | Go back (e.g., from album to search) |
-| `Space` | Normal | Play/Pause toggle |
-| `j` / `k` / arrows | Normal | Navigate results |
-| `gg` / `G` | Normal | Jump to first / last result |
-| `Tab` / `Shift+Tab` | Normal | Cycle providers |
-| `1` / `2` | Normal | Switch to Bandcamp / YouTube directly |
-| `Ctrl+h` / `Ctrl+l` | Normal | Focus search / logs panel |
-| `:q` | Command | Quit (or close logs if focused) |
-| `:l` | Command | Toggle log panel |
-| `Ctrl+c` | Any | Force quit |
 
 ## License
 
