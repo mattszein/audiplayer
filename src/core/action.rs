@@ -6,6 +6,7 @@ use crate::core::Mode;
 pub enum ResultType {
     Track,
     Album,
+    Artist,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +35,7 @@ pub enum Action {
     SearchSubmit,
     CursorDown,
     CursorUp,
+    GoBack,
 
     // ── Command Line ──────────────────────────────────────────────
     CommandInput(char),
@@ -42,6 +44,7 @@ pub enum Action {
 
     // ── Resolve Stream URL ────────────────────────────────────────
     ResolveStreamUrl(Track),
+    FetchAlbumTracks(Track),
 
     // ── Input ─────────────────────────────────────────────────────
     Key(KeyEvent),
@@ -65,6 +68,8 @@ pub struct Track {
     pub title: String,
     pub artist: String,
     pub album: Option<String>,
+    pub artist_id: Option<String>,
+    pub album_id: Option<String>,
     pub url: String,
     pub stream_url: Option<String>,
     pub provider: String,
@@ -91,6 +96,7 @@ pub enum PlayerEvent {
 #[derive(Debug, Clone)]
 pub enum PluginResult {
     Search(Vec<Track>),
+    AlbumTracks(Vec<Track>),
     StreamUrl { 
         track_id: String, 
         url: String,

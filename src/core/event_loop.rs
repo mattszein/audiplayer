@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crossterm::event::{KeyCode, KeyModifiers, KeyEvent};
 
 use crate::core::{
-    action::{Action, PlayerEvent, PluginResult, Track},
+    action::{Action, PlayerEvent, PluginResult, ResultType, Track},
     state::{AppState, Focus, PlaybackStatus},
     Mode,
 };
@@ -55,12 +55,12 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
     match action {
         Action::Quit => return true,
         Action::Log(msg) => {
+            eprintln!("{}", msg);
             state.logs.push(msg);
             if state.logs.len() > 500 { state.logs.remove(0); }
         }
         Action::Key(key) => {
-             if (key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c')) ||
-                (state.mode == Mode::Normal && key.code == KeyCode::Char('q') && state.focus != Focus::Logs) {
+             if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
                  return true;
              }
              return handle_key_event(key, state, player, plugins);
@@ -109,6 +109,8 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
             let search = state.get_active_search_mut();
             search.is_loading = true;
             search.resolving.clear();
+            search.history.clear();
+            search.breadcrumbs = vec!["Search".to_string(), search.input.clone()];
             let query = search.input.clone();
             let plugins_clone = plugins.clone();
             tokio::spawn(async move {
@@ -170,15 +172,54 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
             PlaybackStatus::Stopped => {
                 let search = state.get_active_search();
                 if let Some(track) = search.results.get(search.cursor) {
-                    handle_action(Action::Play(track.clone()), state, player, plugins);
+                    if track.result_type == ResultType::Album {
+                        handle_action(Action::FetchAlbumTracks(track.clone()), state, player, plugins);
+                    } else {
+                        handle_action(Action::Play(track.clone()), state, player, plugins);
+                    }
                 }
             }
         }
         Action::PlaySelected => {
             let search = state.get_active_search();
             if let Some(track) = search.results.get(search.cursor) {
-                handle_action(Action::Play(track.clone()), state, player, plugins);
+                match track.result_type {
+                    ResultType::Album => {
+                        handle_action(Action::FetchAlbumTracks(track.clone()), state, player, plugins);
+                    }
+                    ResultType::Artist => {
+                        state.logs.push(format!("Discography fetch for artist {} not implemented yet", track.artist));
+                    }
+                    ResultType::Track => {
+                        handle_action(Action::Play(track.clone()), state, player, plugins);
+                    }
+                }
             }
+        }
+
+        Action::GoBack => {
+            let search = state.get_active_search_mut();
+            if let Some((old_results, old_cursor)) = search.history.pop() {
+                search.results = old_results;
+                search.cursor = old_cursor;
+                search.breadcrumbs.pop();
+            }
+        }
+
+        Action::FetchAlbumTracks(track) => {
+            let provider = state.active_provider.clone();
+            let search = state.get_active_search_mut();
+            
+            // Save current state to history
+            search.history.push((search.results.clone(), search.cursor));
+            search.breadcrumbs.push(track.title.clone());
+
+            search.is_loading = true;
+            search.resolving.clear();
+            let plugins_clone = plugins.clone();
+            tokio::spawn(async move {
+                plugins_clone.handle_fetch_album_tracks(&provider, track).await;
+            });
         }
 
         Action::MpvStdout(line) => state.playback.last_mpv_line = Some(line),
@@ -193,6 +234,17 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
         Action::PluginResponse { id, result } => {
             match result {
                 PluginResult::Search(tracks) => {
+                    if let Some(search) = state.search_states.get_mut(&id) {
+                        search.results = tracks;
+                        search.is_loading = false;
+                        search.cursor = 0;
+                        search.resolving.clear();
+                        if id == state.active_provider {
+                            preload_selected_track(state, plugins);
+                        }
+                    }
+                }
+                PluginResult::AlbumTracks(tracks) => {
                     if let Some(search) = state.search_states.get_mut(&id) {
                         search.results = tracks;
                         search.is_loading = false;
@@ -219,6 +271,8 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
                             current.stream_url = Some(url.clone());
                             if duration.is_some() { current.duration = duration; }
                             if bitrate.is_some() { current.bitrate = bitrate; }
+                            
+                            // If we were waiting for this track to resolve, play it now
                             if state.playback.status == PlaybackStatus::Playing {
                                 let mut t = current.clone();
                                 t.url = url;
@@ -245,7 +299,7 @@ fn preload_selected_track(state: &mut AppState, plugins: &Arc<PluginManager>) {
     let active_provider = state.active_provider.clone();
     let search = state.search_states.get_mut(&active_provider).unwrap();
     if let Some(track) = search.results.get(search.cursor) {
-        if track.stream_url.is_none() && !search.resolving.contains(&track.id) {
+        if track.result_type == ResultType::Track && track.stream_url.is_none() && !search.resolving.contains(&track.id) {
             let track_clone = track.clone();
             let plugins_clone = plugins.clone();
             search.resolving.insert(track.id.clone());
@@ -321,6 +375,9 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState, player: &Arc<MpvPlayer>
             }
             (KeyModifiers::NONE, KeyCode::Enter) => {
                 handle_action(Action::PlaySelected, state, player, plugins);
+            }
+            (KeyModifiers::NONE, KeyCode::Backspace) => {
+                handle_action(Action::GoBack, state, player, plugins);
             }
             
             (KeyModifiers::NONE, KeyCode::Char('q')) if state.focus == Focus::Logs => {

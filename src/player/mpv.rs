@@ -146,6 +146,8 @@ impl Player for MpvPlayer {
             track.url.clone().into(),
             "replace".into(),
         ]).await?;
+        // Ensure playback starts even if it was paused
+        self.resume().await?;
         Ok(())
     }
 

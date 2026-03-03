@@ -53,6 +53,8 @@ pub struct SearchState {
     pub cursor: usize,       // selected row in the results list
     pub is_loading: bool,
     pub resolving: HashSet<String>, // IDs currently being preloaded
+    pub history: Vec<(Vec<Track>, usize)>, // (results, cursor)
+    pub breadcrumbs: Vec<String>,
 }
 
 impl SearchState {
@@ -63,6 +65,8 @@ impl SearchState {
             cursor: 0,
             is_loading: false,
             resolving: HashSet::new(),
+            history: Vec::new(),
+            breadcrumbs: vec!["Search".to_string()],
         }
     }
 }
