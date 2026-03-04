@@ -108,6 +108,13 @@ src/
     └── events.rs        # Blocking crossterm event reader thread
 ```
 
+## Commit Style
+
+- One-line message, no body, no co-author
+- Start with a verb: Add, Fix, Update, Remove, Refactor
+- Concise summary of what changed, not how
+- Example: `Add Now Playing panel, queue management, and auto-advance playback`
+
 ## mpv IPC Details
 
 - Socket path: `/tmp/mpv-socket-audiplayer`
