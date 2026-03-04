@@ -10,6 +10,15 @@ pub enum Focus {
     Player,
     Search,
     Logs,
+    NowPlaying,
+}
+
+/// A playing context: list of tracks, current playing index, and scroll cursor.
+#[derive(Debug, Clone)]
+pub struct NowPlaying {
+    pub tracks: Vec<Track>,
+    pub current_index: usize, // currently playing track
+    pub cursor: usize,        // scroll/selection cursor in the panel
 }
 
 /// Playback status of the audio engine.
@@ -87,6 +96,12 @@ pub struct AppState {
     pub show_logs: bool,
     pub logs: Vec<String>,
 
+    pub now_playing: Option<NowPlaying>,
+    pub now_playing_history: Vec<NowPlaying>,
+    pub now_playing_future: Vec<NowPlaying>,
+    pub show_now_playing: bool,
+    pub autoplay_add: bool,
+
     pub last_key: Option<KeyEvent>,
 }
 
@@ -115,6 +130,11 @@ impl AppState {
             providers,
             show_logs: false,
             logs: Vec::new(),
+            now_playing: None,
+            now_playing_history: Vec::new(),
+            now_playing_future: Vec::new(),
+            show_now_playing: false,
+            autoplay_add: false,
             last_key: None,
         }
     }

@@ -66,14 +66,19 @@ pub fn render(frame: &mut Frame, state: &AppState) {
         render_player(frame, main_layout[0], state);
     
         let content_area = main_layout[1];
-        if state.show_logs {
+        let show_right = state.show_now_playing || state.show_logs;
+        if show_right {
             let content_layout = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
                 .split(content_area);
-            
+
             render_search(frame, content_layout[0], state);
-            render_logs(frame, content_layout[1], state);
+            if state.show_now_playing {
+                render_now_playing(frame, content_layout[1], state);
+            } else {
+                render_logs(frame, content_layout[1], state);
+            }
         } else {
             render_search(frame, content_area, state);
         }
@@ -126,11 +131,19 @@ fn render_player(frame: &mut Frame, area: Rect, state: &AppState) {
         PlaybackStatus::Stopped => "⏹",
     };
 
-    let player_line = Line::from(vec![
+    let mut spans = vec![
         Span::styled(
             format!(" {} ", status_icon),
             Style::default().fg(Color::Green),
         ),
+    ];
+    if state.autoplay_add {
+        spans.push(Span::styled(
+            "[AP] ",
+            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+        ));
+    }
+    spans.extend([
         Span::styled(title, Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" — "),
         Span::styled(artist, Style::default().fg(Color::Gray)),
@@ -140,6 +153,7 @@ fn render_player(frame: &mut Frame, area: Rect, state: &AppState) {
             Style::default().fg(Color::Yellow),
         ),
     ]);
+    let player_line = Line::from(spans);
 
     frame.render_widget(Paragraph::new(player_line), rows[0]);
 }
@@ -499,6 +513,92 @@ fn render_results(frame: &mut Frame, area: Rect, state: &AppState) {
     let mut list_state = ListState::default();
     list_state.select(Some(s.cursor));
     frame.render_stateful_widget(List::new(items), layout[1], &mut list_state);
+}
+
+fn render_now_playing(frame: &mut Frame, area: Rect, state: &AppState) {
+    let focused = state.focus == Focus::NowPlaying;
+    let np = match &state.now_playing {
+        Some(np) => np,
+        None => {
+            let block = focused_block(focused, " Now Playing ".to_string(), None);
+            let inner = block.inner(area);
+            frame.render_widget(block, area);
+            frame.render_widget(
+                Paragraph::new("  No tracks").style(Style::default().fg(Color::DarkGray)),
+                inner,
+            );
+            return;
+        }
+    };
+
+    // Panel title: "Now Playing" or "History N" depending on navigation depth
+    let depth = state.now_playing_future.len();
+    let panel_title = if depth == 0 {
+        " Now Playing ".to_string()
+    } else {
+        format!(" History {} ", depth)
+    };
+
+    let has_history = !state.now_playing_history.is_empty() || !state.now_playing_future.is_empty();
+    let bottom_title = if has_history {
+        let total = state.now_playing_history.len() + 1 + state.now_playing_future.len();
+        let pos = state.now_playing_history.len() + 1;
+        Some(Line::from(vec![
+            Span::styled(format!(" [{}/{}] ", pos, total), Style::default().fg(Color::DarkGray)),
+            Span::styled(" Shift+H/L: navigate ", Style::default().fg(Color::DarkGray)),
+        ]))
+    } else {
+        None
+    };
+
+    let block = focused_block(focused, panel_title, bottom_title);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let playing_track_id = state.playback.track.as_ref()
+        .filter(|_| state.playback.status != PlaybackStatus::Stopped)
+        .map(|t| t.id.as_str());
+
+    let items: Vec<ListItem> = np
+        .tracks
+        .iter()
+        .enumerate()
+        .map(|(i, track)| {
+            let is_playing = playing_track_id == Some(track.id.as_str());
+            let is_selected = focused && i == np.cursor;
+            let prefix = if is_playing { "♫ " } else if is_selected { "▶ " } else { "  " };
+            let duration_str = track
+                .duration
+                .map(format_duration)
+                .unwrap_or_default();
+            let text = format!("{}{}.  {}  {}", prefix, i + 1, track.title, duration_str);
+
+            let style = if is_playing {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+            } else if is_selected {
+                Style::default()
+                    .fg(colors::SELECTED_FG)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+
+            let bg = if is_selected {
+                Style::default().bg(colors::SELECTED_BG)
+            } else if is_playing {
+                Style::default().bg(Color::Rgb(30, 30, 0))
+            } else {
+                Style::default()
+            };
+            ListItem::new(Line::from(Span::styled(text, style))).style(bg)
+        })
+        .collect();
+
+    let mut list_state = ListState::default();
+    list_state.select(Some(np.cursor));
+    frame.render_stateful_widget(List::new(items), inner, &mut list_state);
 }
 
 fn render_logs(frame: &mut Frame, area: Rect, state: &AppState) {

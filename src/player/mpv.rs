@@ -126,12 +126,14 @@ async fn handle_mpv_event(event: serde_json::Value, action_tx: &Sender<Action>) 
     if let Some(event_name) = event.get("event").and_then(|e| e.as_str()) {
         match event_name {
             "end-file" => {
-                // Check reason - if it's 'error', we might want to log it
                 let reason = event.get("reason").and_then(|r| r.as_str()).unwrap_or("unknown");
-                if reason != "quit" && reason != "stop" && reason != "eof" {
-                     eprintln!("mpv playback ended with reason: {}", reason);
+                // Only auto-advance on natural end (eof).
+                // "stop" fires on loadfile replace — ignore it to prevent cascade.
+                if reason == "eof" {
+                    let _ = action_tx.send(Action::PlayerEvent(PlayerEvent::TrackEnded)).await;
+                } else if reason != "quit" && reason != "stop" && reason != "redirect" {
+                    eprintln!("mpv playback ended with reason: {}", reason);
                 }
-                let _ = action_tx.send(Action::PlayerEvent(PlayerEvent::TrackEnded)).await;
             }
             _ => {}
         }
