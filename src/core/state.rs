@@ -6,6 +6,7 @@ use crate::tui::theme::Theme;
 use crossterm::event::KeyEvent;
 
 /// Which panel currently has keyboard focus.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Focus {
     Player,
@@ -37,8 +38,10 @@ pub struct PlaybackState {
     pub position: Duration,
     pub duration: Duration,
     pub percent: u8,
+    pub volume: u8,
+    pub muted: bool,
     pub track: Option<Track>,
-    pub last_mpv_line: Option<String>,
+    pub status_message: Option<String>,
 }
 
 impl PlaybackState {
@@ -130,8 +133,10 @@ impl AppState {
                 position: Duration::from_secs(0),
                 duration: Duration::from_secs(0),
                 percent: 0,
+                volume: 100,
+                muted: false,
                 track: None,
-                last_mpv_line: None,
+                status_message: None,
             },
             search_states,
             active_provider: "bandcamp".to_string(),
@@ -142,7 +147,7 @@ impl AppState {
             now_playing_history: Vec::new(),
             now_playing_future: Vec::new(),
             show_now_playing: false,
-            autoplay_add: false,
+            autoplay_add: true,
             last_key: None,
             theme: Theme::default_theme(),
             show_help: false,

@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::time::Duration;
 
 use crate::core::action::{Track, ResultType};
-use crate::plugins::traits::{Capability, Provider};
+use crate::plugins::traits::Provider;
 
 pub struct YouTubeProvider {}
 
@@ -16,10 +16,6 @@ impl YouTubeProvider {
 
 #[async_trait]
 impl Provider for YouTubeProvider {
-    fn id(&self) -> &str { "youtube" }
-    fn display_name(&self) -> &str { "YouTube" }
-    fn capabilities(&self) -> Vec<Capability> { vec![Capability::Search] }
-
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<Track>> {
         let search_query = format!("ytsearch{}:{}", limit, query);
         let output = tokio::process::Command::new("yt-dlp")

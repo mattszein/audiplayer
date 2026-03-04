@@ -1,17 +1,19 @@
 use anyhow::Result;
-use tokio::sync::mpsc::Receiver;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use notify_rust::Notification;
 use std::sync::Arc;
-use crossterm::event::{KeyCode, KeyModifiers, KeyEvent};
+use std::time::Duration;
+use tokio::sync::mpsc::Receiver;
 
 use crate::core::{
+    Mode,
     action::{Action, PlayerEvent, PluginResult, ResultType},
     state::{AppState, Focus, NowPlaying, PlaybackStatus},
-    Mode,
 };
-use crate::tui::Tui;
-use crate::tui::theme::{Theme, ThemeMode};
 use crate::player::{Player, mpv::MpvPlayer};
 use crate::plugins::PluginManager;
+use crate::tui::Tui;
+use crate::tui::theme::{Theme, ThemeMode};
 
 /// The heart of the app. Receives Actions from all sources,
 /// mutates AppState, and asks the TUI to re-render.
@@ -52,29 +54,40 @@ pub async fn run(
 }
 
 /// Side effects and state mutation. Returns true if app should quit.
-fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, plugins: &Arc<PluginManager>) -> bool {
+fn handle_action(
+    action: Action,
+    state: &mut AppState,
+    player: &Arc<MpvPlayer>,
+    plugins: &Arc<PluginManager>,
+) -> bool {
     match action {
         Action::Quit => return true,
         Action::Log(msg) => {
             eprintln!("{}", msg);
             state.logs.push(msg);
-            if state.logs.len() > 500 { state.logs.remove(0); }
+            if state.logs.len() > 500 {
+                state.logs.remove(0);
+            }
         }
         Action::Key(key) => {
-             if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
-                 return true;
-             }
-             return handle_key_event(key, state, player, plugins);
+            if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
+                return true;
+            }
+            return handle_key_event(key, state, player, plugins);
         }
 
         Action::SetMode(mode) => {
             state.mode = mode;
-            if mode == Mode::Command { state.command_input = String::new(); }
+            if mode == Mode::Command {
+                state.command_input = String::new();
+            }
         }
 
         // ── Command Handling ──────────────────────────────────────────
         Action::CommandInput(c) => state.command_input.push(c),
-        Action::CommandBackspace => { state.command_input.pop(); }
+        Action::CommandBackspace => {
+            state.command_input.pop();
+        }
         Action::CommandExecute => {
             let cmd = state.command_input.trim();
             match cmd {
@@ -88,8 +101,11 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
                 }
                 "l" | "log" => {
                     state.show_logs = !state.show_logs;
-                    if state.show_logs { state.focus = Focus::Logs; }
-                    else if state.focus == Focus::Logs { state.focus = Focus::Search; }
+                    if state.show_logs {
+                        state.focus = Focus::Logs;
+                    } else if state.focus == Focus::Logs {
+                        state.focus = Focus::Search;
+                    }
                 }
                 "theme" | "t" => {
                     handle_action(Action::OpenThemeSelector, state, player, plugins);
@@ -97,10 +113,12 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
                 "mode" | "dm" => {
                     handle_action(Action::CycleThemeMode, state, player, plugins);
                 }
-                "help" | "keys" | "k" => {
+                "help" | "keys" | "h" => {
                     handle_action(Action::ToggleHelp, state, player, plugins);
                 }
-                _ => { state.logs.push(format!("Unknown command: {}", cmd)); }
+                _ => {
+                    state.logs.push(format!("Unknown command: {}", cmd));
+                }
             }
             state.mode = Mode::Normal;
         }
@@ -113,7 +131,9 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
         }
 
         Action::SearchInput(c) => state.get_active_search_mut().input.push(c),
-        Action::SearchBackspace => { state.get_active_search_mut().input.pop(); }
+        Action::SearchBackspace => {
+            state.get_active_search_mut().input.pop();
+        }
         Action::SearchSubmit => {
             let provider = state.active_provider.clone();
             let search = state.get_active_search_mut();
@@ -156,12 +176,19 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
 
         Action::Play(track) => {
             let mut track_to_play = track.clone();
+            let track_info = format!("{} by {}", track.title, track.artist);
+            let _ = Notification::new()
+                .summary("Audiplayer")
+                .body(&format!("Now Playing:\n{}", track_info))
+                .icon("audio-x-generic")
+                .show();
+
             if let Some(stream_url) = &track.stream_url {
                 track_to_play.url = stream_url.clone();
                 state.playback.track = Some(track_to_play.clone());
                 state.playback.status = PlaybackStatus::Playing;
-                state.playback.last_mpv_line = None;
-                
+                state.playback.status_message = None;
+
                 let player_clone = player.clone();
                 tokio::spawn(async move {
                     let _ = player_clone.play(&track_to_play).await;
@@ -169,8 +196,8 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
             } else {
                 state.playback.track = Some(track.clone());
                 state.playback.status = PlaybackStatus::Playing;
-                state.playback.last_mpv_line = Some("Resolving URL...".to_string());
-                
+                state.playback.status_message = Some("Resolving URL...".to_string());
+
                 let track_clone = track.clone();
                 let plugins_clone = plugins.clone();
                 tokio::spawn(async move {
@@ -180,18 +207,34 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
         }
         Action::PlayPause => match state.playback.status {
             PlaybackStatus::Playing => {
-                 state.playback.status = PlaybackStatus::Paused;
-                 let player_clone = player.clone();
-                 tokio::spawn(async move { let _ = player_clone.pause().await; });
+                state.playback.status = PlaybackStatus::Paused;
+                let player_clone = player.clone();
+                tokio::spawn(async move {
+                    let _ = player_clone.pause().await;
+                });
             }
             PlaybackStatus::Paused => {
-                 state.playback.status = PlaybackStatus::Playing;
-                 let player_clone = player.clone();
-                 tokio::spawn(async move { let _ = player_clone.resume().await; });
+                state.playback.status = PlaybackStatus::Playing;
+                let player_clone = player.clone();
+                tokio::spawn(async move {
+                    let _ = player_clone.resume().await;
+                });
             }
             PlaybackStatus::Stopped => {
                 // Nothing playing — do nothing
             }
+        },
+        Action::Stop => {
+            state.playback.status = PlaybackStatus::Stopped;
+            state.playback.track = None;
+            state.playback.status_message = None;
+            state.playback.position = Duration::from_secs(0);
+            state.playback.duration = Duration::from_secs(0);
+            state.playback.percent = 0;
+            let player_clone = player.clone();
+            tokio::spawn(async move {
+                let _ = player_clone.stop().await;
+            });
         }
         Action::PlaySelected => {
             if state.focus == Focus::NowPlaying {
@@ -209,10 +252,18 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
                 if let Some(track) = search.results.get(search.cursor) {
                     match track.result_type {
                         ResultType::Album => {
-                            handle_action(Action::FetchAlbumTracks(track.clone()), state, player, plugins);
+                            handle_action(
+                                Action::FetchAlbumTracks(track.clone()),
+                                state,
+                                player,
+                                plugins,
+                            );
                         }
                         ResultType::Artist => {
-                            state.logs.push(format!("Discography fetch for artist {} not implemented yet", track.artist));
+                            state.logs.push(format!(
+                                "Discography fetch for artist {} not implemented yet",
+                                track.artist
+                            ));
                         }
                         ResultType::Track => {
                             let track_clone = track.clone();
@@ -235,7 +286,7 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
         Action::FetchAlbumTracks(track) => {
             let provider = state.active_provider.clone();
             let search = state.get_active_search_mut();
-            
+
             // Save current state to history
             search.history.push((search.results.clone(), search.cursor));
             search.breadcrumbs.push(track.title.clone());
@@ -244,7 +295,9 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
             search.resolving.clear();
             let plugins_clone = plugins.clone();
             tokio::spawn(async move {
-                plugins_clone.handle_fetch_album_tracks(&provider, track).await;
+                plugins_clone
+                    .handle_fetch_album_tracks(&provider, track)
+                    .await;
             });
         }
 
@@ -287,7 +340,9 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
         }
         Action::NowPlayingAddAll => {
             let search = state.get_active_search();
-            let tracks: Vec<_> = search.results.iter()
+            let tracks: Vec<_> = search
+                .results
+                .iter()
                 .filter(|t| t.result_type == ResultType::Track)
                 .cloned()
                 .collect();
@@ -311,7 +366,9 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
         }
         Action::NowPlayingReplaceAll => {
             let search = state.get_active_search();
-            let tracks: Vec<_> = search.results.iter()
+            let tracks: Vec<_> = search
+                .results
+                .iter()
                 .filter(|t| t.result_type == ResultType::Track)
                 .cloned()
                 .collect();
@@ -359,10 +416,12 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
                 }
             }
         }
-
         Action::OpenThemeSelector => {
             let names = Theme::preset_names();
-            let idx = names.iter().position(|&n| n == state.theme.name).unwrap_or(0);
+            let idx = names
+                .iter()
+                .position(|&n| n == state.theme.name)
+                .unwrap_or(0);
             state.theme_selector_cursor = idx;
             state.theme_before_selector = Some(state.theme.name.to_string());
             state.show_theme_selector = true;
@@ -379,13 +438,50 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
             state.help_scroll = 0;
         }
 
-        Action::MpvStdout(line) => state.playback.last_mpv_line = Some(line),
+        Action::SeekForward(dur) => {
+            let player_clone = player.clone();
+            tokio::spawn(async move {
+                let _ = player_clone.seek_relative(dur.as_secs() as i64).await;
+            });
+        }
+        Action::SeekBackward(dur) => {
+            let player_clone = player.clone();
+            tokio::spawn(async move {
+                let _ = player_clone.seek_relative(-(dur.as_secs() as i64)).await;
+            });
+        }
+        Action::VolumeUp => {
+            state.playback.volume = (state.playback.volume + 5).min(100);
+            let volume = state.playback.volume;
+            let player_clone = player.clone();
+            tokio::spawn(async move {
+                let _ = player_clone.set_volume(volume).await;
+            });
+        }
+        Action::VolumeDown => {
+            state.playback.volume = state.playback.volume.saturating_sub(5);
+            let volume = state.playback.volume;
+            let player_clone = player.clone();
+            tokio::spawn(async move {
+                let _ = player_clone.set_volume(volume).await;
+            });
+        }
+        Action::ToggleMute => {
+            state.playback.muted = !state.playback.muted;
+            let muted = state.playback.muted;
+            let player_clone = player.clone();
+            tokio::spawn(async move {
+                let _ = player_clone.set_mute(muted).await;
+            });
+        }
+
         Action::PlayerEvent(event) => match event {
             PlayerEvent::TrackEnded => {
                 // Try auto-advance in now_playing context
-                let should_advance = state.now_playing.as_ref().is_some_and(|np| {
-                    np.current_index + 1 < np.tracks.len()
-                });
+                let should_advance = state
+                    .now_playing
+                    .as_ref()
+                    .is_some_and(|np| np.current_index + 1 < np.tracks.len());
                 if should_advance {
                     let np = state.now_playing.as_mut().unwrap();
                     np.current_index += 1;
@@ -394,11 +490,17 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
                     handle_action(Action::Play(next_track), state, player, plugins);
                 } else {
                     state.playback.status = PlaybackStatus::Stopped;
-                    state.playback.last_mpv_line = None;
+                    state.playback.status_message = None;
+                    state.playback.position = Duration::from_secs(0);
+                    state.playback.duration = Duration::from_secs(0);
+                    state.playback.percent = 0;
                 }
             }
+            PlayerEvent::TimePosChanged(pos) => state.playback.position = pos,
+            PlayerEvent::DurationChanged(dur) => state.playback.duration = dur,
+            PlayerEvent::PercentChanged(per) => state.playback.percent = per,
             _ => {}
-        }
+        },
 
         Action::PluginResponse { id, result } => {
             match result {
@@ -424,14 +526,23 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
                         }
                     }
                 }
-                PluginResult::StreamUrl { track_id, url, duration, bitrate } => {
+                PluginResult::StreamUrl {
+                    track_id,
+                    url,
+                    duration,
+                    bitrate,
+                } => {
                     for search in state.search_states.values_mut() {
                         search.resolving.remove(&track_id);
                         for track in &mut search.results {
                             if track.id == track_id {
                                 track.stream_url = Some(url.clone());
-                                if duration.is_some() { track.duration = duration; }
-                                if bitrate.is_some() { track.bitrate = bitrate; }
+                                if duration.is_some() {
+                                    track.duration = duration;
+                                }
+                                if bitrate.is_some() {
+                                    track.bitrate = bitrate;
+                                }
                             }
                         }
                     }
@@ -440,23 +551,33 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
                         for track in &mut np.tracks {
                             if track.id == track_id {
                                 track.stream_url = Some(url.clone());
-                                if duration.is_some() { track.duration = duration; }
-                                if bitrate.is_some() { track.bitrate = bitrate; }
+                                if duration.is_some() {
+                                    track.duration = duration;
+                                }
+                                if bitrate.is_some() {
+                                    track.bitrate = bitrate;
+                                }
                             }
                         }
                     }
                     if let Some(ref mut current) = state.playback.track {
                         if current.id == track_id {
                             current.stream_url = Some(url.clone());
-                            if duration.is_some() { current.duration = duration; }
-                            if bitrate.is_some() { current.bitrate = bitrate; }
-                            
+                            if duration.is_some() {
+                                current.duration = duration;
+                            }
+                            if bitrate.is_some() {
+                                current.bitrate = bitrate;
+                            }
+
                             // If we were waiting for this track to resolve, play it now
                             if state.playback.status == PlaybackStatus::Playing {
                                 let mut t = current.clone();
                                 t.url = url;
                                 let player_clone = player.clone();
-                                tokio::spawn(async move { let _ = player_clone.play(&t).await; });
+                                tokio::spawn(async move {
+                                    let _ = player_clone.play(&t).await;
+                                });
                             }
                         }
                     }
@@ -502,7 +623,10 @@ fn preload_selected_track(state: &mut AppState, plugins: &Arc<PluginManager>) {
     let active_provider = state.active_provider.clone();
     let search = state.search_states.get_mut(&active_provider).unwrap();
     if let Some(track) = search.results.get(search.cursor) {
-        if track.result_type == ResultType::Track && track.stream_url.is_none() && !search.resolving.contains(&track.id) {
+        if track.result_type == ResultType::Track
+            && track.stream_url.is_none()
+            && !search.resolving.contains(&track.id)
+        {
             let track_clone = track.clone();
             let plugins_clone = plugins.clone();
             search.resolving.insert(track.id.clone());
@@ -513,7 +637,12 @@ fn preload_selected_track(state: &mut AppState, plugins: &Arc<PluginManager>) {
     }
 }
 
-fn handle_key_event(key: KeyEvent, state: &mut AppState, player: &Arc<MpvPlayer>, plugins: &Arc<PluginManager>) -> bool {
+fn handle_key_event(
+    key: KeyEvent,
+    state: &mut AppState,
+    player: &Arc<MpvPlayer>,
+    plugins: &Arc<PluginManager>,
+) -> bool {
     let last_key = state.last_key.take();
 
     match state.mode {
@@ -522,11 +651,14 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState, player: &Arc<MpvPlayer>
             match key.code {
                 KeyCode::Char('j') | KeyCode::Down => {
                     state.theme_selector_cursor = (state.theme_selector_cursor + 1) % names.len();
-                    state.theme = Theme::from_name(names[state.theme_selector_cursor], state.theme.mode);
+                    state.theme =
+                        Theme::from_name(names[state.theme_selector_cursor], state.theme.mode);
                 }
                 KeyCode::Char('k') | KeyCode::Up => {
-                    state.theme_selector_cursor = (state.theme_selector_cursor + names.len() - 1) % names.len();
-                    state.theme = Theme::from_name(names[state.theme_selector_cursor], state.theme.mode);
+                    state.theme_selector_cursor =
+                        (state.theme_selector_cursor + names.len() - 1) % names.len();
+                    state.theme =
+                        Theme::from_name(names[state.theme_selector_cursor], state.theme.mode);
                 }
                 KeyCode::Enter => {
                     state.show_theme_selector = false;
@@ -542,152 +674,237 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState, player: &Arc<MpvPlayer>
                 _ => {}
             }
         }
-        Mode::Normal if state.show_help => {
-            match key.code {
-                KeyCode::Char('j') | KeyCode::Down => { state.help_scroll = state.help_scroll.saturating_add(1); }
-                KeyCode::Char('k') | KeyCode::Up => { state.help_scroll = state.help_scroll.saturating_sub(1); }
-                KeyCode::Char('q') | KeyCode::Esc => { state.show_help = false; }
-                _ => {}
+        Mode::Normal if state.show_help => match key.code {
+            KeyCode::Char('j') | KeyCode::Down => {
+                state.help_scroll = state.help_scroll.saturating_add(1);
             }
-        }
+            KeyCode::Char('k') | KeyCode::Up => {
+                state.help_scroll = state.help_scroll.saturating_sub(1);
+            }
+            KeyCode::Char('q') | KeyCode::Esc => {
+                state.show_help = false;
+            }
+            _ => {}
+        },
         Mode::Normal => match (key.modifiers, key.code) {
-                (KeyModifiers::NONE, KeyCode::Char(':')) => {
-                    state.mode = Mode::Command;
-                    state.command_input = String::new();
-                }
-                (KeyModifiers::NONE, KeyCode::Char('i')) => {
-                    state.mode = Mode::Insert;
-                    state.focus = Focus::Search;
-                }
+            (KeyModifiers::NONE, KeyCode::Char(':')) => {
+                state.mode = Mode::Command;
+                state.command_input = String::new();
+            }
+            (KeyModifiers::NONE, KeyCode::Char('i')) => {
+                state.mode = Mode::Insert;
+                state.focus = Focus::Search;
+            }
 
-                (KeyModifiers::NONE, KeyCode::Tab) => {
-                    let idx = state.providers.iter().position(|p| p == &state.active_provider).unwrap_or(0);
-                    let next_idx = (idx + 1) % state.providers.len();
-                    let next_provider = state.providers[next_idx].clone();
-                    handle_action(Action::SwitchProvider(next_provider), state, player, plugins);
-                }
-                (KeyModifiers::SHIFT, KeyCode::BackTab) => {
-                    let idx = state.providers.iter().position(|p| p == &state.active_provider).unwrap_or(0);
-                    let next_idx = (idx + state.providers.len() - 1) % state.providers.len();
-                    let next_provider = state.providers[next_idx].clone();
-                    handle_action(Action::SwitchProvider(next_provider), state, player, plugins);
-                }
+            (KeyModifiers::NONE, KeyCode::Tab) => {
+                let idx = state
+                    .providers
+                    .iter()
+                    .position(|p| p == &state.active_provider)
+                    .unwrap_or(0);
+                let next_idx = (idx + 1) % state.providers.len();
+                let next_provider = state.providers[next_idx].clone();
+                handle_action(
+                    Action::SwitchProvider(next_provider),
+                    state,
+                    player,
+                    plugins,
+                );
+            }
+            (KeyModifiers::SHIFT, KeyCode::BackTab) => {
+                let idx = state
+                    .providers
+                    .iter()
+                    .position(|p| p == &state.active_provider)
+                    .unwrap_or(0);
+                let next_idx = (idx + state.providers.len() - 1) % state.providers.len();
+                let next_provider = state.providers[next_idx].clone();
+                handle_action(
+                    Action::SwitchProvider(next_provider),
+                    state,
+                    player,
+                    plugins,
+                );
+            }
 
-                (KeyModifiers::CONTROL, KeyCode::Left) | (KeyModifiers::NONE, KeyCode::Left) | (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
-                    state.focus = Focus::Search;
+            (KeyModifiers::CONTROL, KeyCode::Left)
+            | (KeyModifiers::NONE, KeyCode::Left)
+            | (KeyModifiers::CONTROL, KeyCode::Char('h')) => {
+                state.focus = Focus::Search;
+            }
+            (KeyModifiers::CONTROL, KeyCode::Right)
+            | (KeyModifiers::NONE, KeyCode::Right)
+            | (KeyModifiers::CONTROL, KeyCode::Char('l')) => {
+                if state.show_now_playing {
+                    state.focus = Focus::NowPlaying;
+                } else if state.show_logs {
+                    state.focus = Focus::Logs;
                 }
-                (KeyModifiers::CONTROL, KeyCode::Right) | (KeyModifiers::NONE, KeyCode::Right) | (KeyModifiers::CONTROL, KeyCode::Char('l')) => {
-                    if state.show_now_playing { state.focus = Focus::NowPlaying; }
-                    else if state.show_logs { state.focus = Focus::Logs; }
-                }
+            }
 
-                // Now Playing: add/replace selected track or all results
-                (KeyModifiers::NONE, KeyCode::Char('a')) => {
-                    handle_action(Action::NowPlayingAdd, state, player, plugins);
-                }
-                (KeyModifiers::NONE, KeyCode::Char('r')) => {
-                    handle_action(Action::NowPlayingReplace, state, player, plugins);
-                }
-                (KeyModifiers::SHIFT, KeyCode::Char('A')) => {
-                    handle_action(Action::NowPlayingAddAll, state, player, plugins);
-                }
-                (KeyModifiers::SHIFT, KeyCode::Char('R')) => {
-                    handle_action(Action::NowPlayingReplaceAll, state, player, plugins);
-                }
+            // Now Playing: add/replace selected track or all results
+            (KeyModifiers::NONE, KeyCode::Char('a')) => {
+                handle_action(Action::NowPlayingAdd, state, player, plugins);
+            }
+            (KeyModifiers::NONE, KeyCode::Char('r')) => {
+                handle_action(Action::NowPlayingReplace, state, player, plugins);
+            }
+            (KeyModifiers::SHIFT, KeyCode::Char('A')) => {
+                handle_action(Action::NowPlayingAddAll, state, player, plugins);
+            }
+            (KeyModifiers::SHIFT, KeyCode::Char('R')) => {
+                handle_action(Action::NowPlayingReplaceAll, state, player, plugins);
+            }
 
-                // Now Playing history navigation
-                (KeyModifiers::SHIFT, KeyCode::Char('H')) if state.focus == Focus::NowPlaying => {
-                    handle_action(Action::NowPlayingBack, state, player, plugins);
-                }
-                (KeyModifiers::SHIFT, KeyCode::Char('L')) if state.focus == Focus::NowPlaying => {
-                    handle_action(Action::NowPlayingForward, state, player, plugins);
-                }
+            // Now Playing history navigation
+            (KeyModifiers::SHIFT, KeyCode::Char('H')) if state.focus == Focus::NowPlaying => {
+                handle_action(Action::NowPlayingBack, state, player, plugins);
+            }
+            (KeyModifiers::SHIFT, KeyCode::Char('L')) if state.focus == Focus::NowPlaying => {
+                handle_action(Action::NowPlayingForward, state, player, plugins);
+            }
 
-                (KeyModifiers::NONE, KeyCode::Char('j')) | (KeyModifiers::NONE, KeyCode::Down) => {
-                    handle_action(Action::CursorDown, state, player, plugins);
-                }
-                (KeyModifiers::NONE, KeyCode::Char('k')) | (KeyModifiers::NONE, KeyCode::Up) => {
-                    handle_action(Action::CursorUp, state, player, plugins);
-                }
+            (KeyModifiers::NONE, KeyCode::Char('j')) | (KeyModifiers::NONE, KeyCode::Down) => {
+                handle_action(Action::CursorDown, state, player, plugins);
+            }
+            (KeyModifiers::NONE, KeyCode::Char('k')) | (KeyModifiers::NONE, KeyCode::Up) => {
+                handle_action(Action::CursorUp, state, player, plugins);
+            }
 
-                // gg -> first
-                (KeyModifiers::NONE, KeyCode::Char('g')) => {
-                    if let Some(KeyEvent { code: KeyCode::Char('g'), .. }) = last_key {
-                        if state.focus == Focus::NowPlaying {
-                            if let Some(ref mut np) = state.now_playing {
-                                np.cursor = 0;
-                            }
-                        } else {
-                            let search = state.get_active_search_mut();
-                            search.cursor = 0;
-                            preload_selected_track(state, plugins);
-                        }
-                    } else {
-                        state.last_key = Some(key);
-                    }
-                }
-                // G -> last
-                (KeyModifiers::SHIFT, KeyCode::Char('G')) => {
+            // gg -> first
+            (KeyModifiers::NONE, KeyCode::Char('g')) => {
+                if let Some(KeyEvent {
+                    code: KeyCode::Char('g'),
+                    ..
+                }) = last_key
+                {
                     if state.focus == Focus::NowPlaying {
                         if let Some(ref mut np) = state.now_playing {
-                            if !np.tracks.is_empty() {
-                                np.cursor = np.tracks.len() - 1;
-                            }
+                            np.cursor = 0;
                         }
                     } else {
                         let search = state.get_active_search_mut();
-                        if !search.results.is_empty() {
-                            search.cursor = search.results.len() - 1;
-                            preload_selected_track(state, plugins);
+                        search.cursor = 0;
+                        preload_selected_track(state, plugins);
+                    }
+                } else {
+                    state.last_key = Some(key);
+                }
+            }
+            // G -> last
+            (KeyModifiers::SHIFT, KeyCode::Char('G')) => {
+                if state.focus == Focus::NowPlaying {
+                    if let Some(ref mut np) = state.now_playing {
+                        if !np.tracks.is_empty() {
+                            np.cursor = np.tracks.len() - 1;
                         }
                     }
+                } else {
+                    let search = state.get_active_search_mut();
+                    if !search.results.is_empty() {
+                        search.cursor = search.results.len() - 1;
+                        preload_selected_track(state, plugins);
+                    }
                 }
+            }
 
-                (KeyModifiers::NONE, KeyCode::Char('e')) => {
-                    handle_action(Action::ToggleNowPlaying, state, player, plugins);
-                }
-                (KeyModifiers::NONE, KeyCode::Char(' ')) => {
-                    handle_action(Action::PlayPause, state, player, plugins);
-                }
-                (KeyModifiers::NONE, KeyCode::Enter) => {
-                    handle_action(Action::PlaySelected, state, player, plugins);
-                }
-                (KeyModifiers::NONE, KeyCode::Backspace) if state.focus == Focus::Search => {
-                    handle_action(Action::GoBack, state, player, plugins);
-                }
+            (KeyModifiers::NONE, KeyCode::Char('e')) => {
+                handle_action(Action::ToggleNowPlaying, state, player, plugins);
+            }
+            (KeyModifiers::NONE, KeyCode::Char(' ')) => {
+                handle_action(Action::PlayPause, state, player, plugins);
+            }
+            (KeyModifiers::SHIFT, KeyCode::Char('S')) => {
+                handle_action(Action::Stop, state, player, plugins);
+            }
+            (KeyModifiers::NONE, KeyCode::Enter) => {
+                handle_action(Action::PlaySelected, state, player, plugins);
+            }
+            (KeyModifiers::NONE, KeyCode::Backspace) if state.focus == Focus::Search => {
+                handle_action(Action::GoBack, state, player, plugins);
+            }
 
-                (KeyModifiers::NONE, KeyCode::Char('p')) => {
-                    handle_action(Action::ToggleAutoplayAdd, state, player, plugins);
-                }
+            (KeyModifiers::NONE, KeyCode::Char('p')) => {
+                handle_action(Action::ToggleAutoplayAdd, state, player, plugins);
+            }
 
-                (KeyModifiers::NONE, KeyCode::Char('q')) if state.focus == Focus::Logs => {
-                    state.show_logs = false;
-                    state.focus = Focus::Search;
-                }
+            // Volume and Seek
+            (KeyModifiers::NONE, KeyCode::Char('[')) => {
+                handle_action(Action::VolumeDown, state, player, plugins);
+            }
+            (KeyModifiers::NONE, KeyCode::Char(']')) => {
+                handle_action(Action::VolumeUp, state, player, plugins);
+            }
+            (KeyModifiers::NONE, KeyCode::Char('m')) => {
+                handle_action(Action::ToggleMute, state, player, plugins);
+            }
+            (KeyModifiers::NONE, KeyCode::Char('.')) => {
+                handle_action(
+                    Action::SeekForward(Duration::from_secs(5)),
+                    state,
+                    player,
+                    plugins,
+                );
+            }
+            (KeyModifiers::NONE, KeyCode::Char(',')) => {
+                handle_action(
+                    Action::SeekBackward(Duration::from_secs(5)),
+                    state,
+                    player,
+                    plugins,
+                );
+            }
 
-                (KeyModifiers::NONE, KeyCode::Char('1')) => { handle_action(Action::SwitchProvider("bandcamp".into()), state, player, plugins); }
-                (KeyModifiers::NONE, KeyCode::Char('2')) => { handle_action(Action::SwitchProvider("youtube".into()), state, player, plugins); }
-                _ => {}
-            },
+            (KeyModifiers::NONE, KeyCode::Char('q')) if state.focus == Focus::Logs => {
+                state.show_logs = false;
+                state.focus = Focus::Search;
+            }
+
+            (KeyModifiers::NONE, KeyCode::Char('1')) => {
+                handle_action(
+                    Action::SwitchProvider("bandcamp".into()),
+                    state,
+                    player,
+                    plugins,
+                );
+            }
+            (KeyModifiers::NONE, KeyCode::Char('2')) => {
+                handle_action(
+                    Action::SwitchProvider("youtube".into()),
+                    state,
+                    player,
+                    plugins,
+                );
+            }
+            _ => {}
+        },
         Mode::Insert => match (key.modifiers, key.code) {
             (KeyModifiers::NONE, KeyCode::Esc) => state.mode = Mode::Normal,
             (KeyModifiers::NONE, KeyCode::Enter) => {
                 handle_action(Action::SearchSubmit, state, player, plugins);
                 state.mode = Mode::Normal;
             }
-            (KeyModifiers::NONE, KeyCode::Backspace) => { state.get_active_search_mut().input.pop(); }
-            (KeyModifiers::NONE, KeyCode::Char(c)) => { state.get_active_search_mut().input.push(c); }
+            (KeyModifiers::NONE, KeyCode::Backspace) => {
+                state.get_active_search_mut().input.pop();
+            }
+            (KeyModifiers::NONE, KeyCode::Char(c)) => {
+                state.get_active_search_mut().input.push(c);
+            }
             _ => {}
         },
         Mode::Command => match (key.modifiers, key.code) {
             (KeyModifiers::NONE, KeyCode::Esc) => state.mode = Mode::Normal,
-            (KeyModifiers::NONE, KeyCode::Backspace) => { state.command_input.pop(); }
-            (KeyModifiers::NONE, KeyCode::Char(c)) => { state.command_input.push(c); }
+            (KeyModifiers::NONE, KeyCode::Backspace) => {
+                state.command_input.pop();
+            }
+            (KeyModifiers::NONE, KeyCode::Char(c)) => {
+                state.command_input.push(c);
+            }
             (KeyModifiers::NONE, KeyCode::Enter) => {
                 return handle_action(Action::CommandExecute, state, player, plugins);
             }
             _ => {}
-        }
+        },
     }
     false
 }

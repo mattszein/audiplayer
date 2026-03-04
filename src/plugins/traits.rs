@@ -2,19 +2,9 @@ use async_trait::async_trait;
 use anyhow::Result;
 use crate::core::action::Track;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Capability {
-    Search,
-    Playlists,
-    Recommendations,
-}
-
+#[allow(dead_code)]
 #[async_trait]
 pub trait Provider: Send + Sync {
-    fn id(&self) -> &str;
-    fn display_name(&self) -> &str;
-    fn capabilities(&self) -> Vec<Capability>;
-
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<Track>>;
     async fn get_stream_url(&self, track: &Track) -> Result<String>;
     async fn get_album_tracks(&self, _track: &Track) -> Result<Vec<Track>> { Ok(vec![]) }

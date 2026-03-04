@@ -6,6 +6,7 @@ pub enum ThemeMode {
     Light,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct TextStyle {
     pub small: Modifier,
@@ -58,6 +59,7 @@ pub struct Theme {
     pub text: TextStyle,
 }
 
+#[allow(dead_code)]
 impl Theme {
     fn from_palette(name: &'static str, p: &Palette, mode: ThemeMode) -> Self {
         let (primary, secondary, highlight, support, default, middle, bg) = match mode {

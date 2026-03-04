@@ -41,14 +41,14 @@ Every major subsystem (`player`, `plugins`, `tui` events) runs in its own task o
   - `mpv.rs`:
     - Spawns a headless `mpv` process.
     - Connects via **Unix Domain Sockets (IPC)** for control.
-    - **Terminal Monitoring**: Captures `stdout` byte-by-byte to handle `\r` (carriage return) progress lines without blocking.
+    - **IPC Property Observation**: Automatically observes `time-pos`, `duration`, and `percent-pos` via IPC to deliver real-time progress updates without blocking.
     - Ensures clean process cleanup on exit.
 
 ### `src/plugins/`
 
 - **Responsibility**: Content discovery and stream resolution.
 - **Key Concepts**:
-  - `Provider` Trait: Contract requiring `id`, `display_name`, `capabilities`, `search`, and optionally `get_stream_url` and `get_album_tracks`.
+  - `Provider` Trait: Contract requiring `search`, and optionally `get_stream_url` and `get_album_tracks`.
   - `PluginManager`:
     - **Semaphore**: Limits concurrent `yt-dlp` calls (currently 3) to prevent `429 Too Many Requests` errors for providers that rely on it.
     - **Preloading**: Triggered by the core as the user scrolls. It resolves stream URLs for tracks in the background and caches them in the `Track` metadata.
@@ -63,7 +63,7 @@ Every major subsystem (`player`, `plugins`, `tui` events) runs in its own task o
     - **Pure Rendering**: Takes a reference to `AppState` and draws the screen.
     - **Dynamic Layouts**: Adjusts the layout when logs are toggled and injects contextual selection info into the bottom bar.
     - **Visual Feedback**: Highlights the currently playing track in the active search results.
-    - **Overlays**: Floating help panel (`:k`) and theme selector (`:t`) rendered on top of content.
+    - **Overlays**: Floating help panel (`:h`) and theme selector (`:t`) rendered on top of content.
   - `theme.rs`:
     - **Palette System**: Each theme defines accent and text colors for both dark and light modes via a `Palette` struct.
     - **9 Presets**: default, gruvbox, tokyo-night, rose-pine, catppuccin, everforest, kanagawa, nord, magenta.
