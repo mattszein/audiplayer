@@ -66,6 +66,11 @@ pub enum Action {
     NowPlayingForward,
     ToggleAutoplayAdd,
 
+    // ── UI ─────────────────────────────────────────────────────────
+    OpenThemeSelector,
+    CycleThemeMode,
+    ToggleHelp,
+
     // ── App lifecycle ─────────────────────────────────────────────
     Quit,
     Tick,

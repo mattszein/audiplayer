@@ -2,6 +2,7 @@ use std::time::Duration;
 use std::collections::{HashSet, HashMap};
 use crate::core::action::Track;
 use crate::core::Mode;
+use crate::tui::theme::Theme;
 use crossterm::event::KeyEvent;
 
 /// Which panel currently has keyboard focus.
@@ -103,6 +104,13 @@ pub struct AppState {
     pub autoplay_add: bool,
 
     pub last_key: Option<KeyEvent>,
+
+    pub theme: Theme,
+    pub show_help: bool,
+    pub help_scroll: usize,
+    pub show_theme_selector: bool,
+    pub theme_selector_cursor: usize,
+    pub theme_before_selector: Option<String>,
 }
 
 impl AppState {
@@ -136,6 +144,12 @@ impl AppState {
             show_now_playing: false,
             autoplay_add: false,
             last_key: None,
+            theme: Theme::default_theme(),
+            show_help: false,
+            help_scroll: 0,
+            show_theme_selector: bool::default(),
+            theme_selector_cursor: usize::default(),
+            theme_before_selector: None,
         }
     }
 
