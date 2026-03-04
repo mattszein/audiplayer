@@ -42,6 +42,7 @@ Input → Action::Key → event_loop (handle_action) → mutate AppState → tui
 | `src/tui/mod.rs` | Terminal setup/teardown | `Tui` |
 | `src/tui/ui.rs` | Pure rendering functions | `render()` and sub-renderers |
 | `src/tui/events.rs` | Blocking input listener thread | `spawn_input_listener()` |
+| `src/tui/theme.rs` | Theme system with dark/light modes | `Theme`, `ThemeMode`, `TextStyle`, `Palette` |
 
 ## Critical Conventions
 
@@ -105,7 +106,8 @@ src/
 └── tui/
     ├── mod.rs           # Tui struct: terminal lifecycle
     ├── ui.rs            # Pure rendering (render, render_player, render_search, etc.)
-    └── events.rs        # Blocking crossterm event reader thread
+    ├── events.rs        # Blocking crossterm event reader thread
+    └── theme.rs         # Theme system: palettes, dark/light modes, 9 presets
 ```
 
 ## Commit Style
