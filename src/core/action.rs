@@ -9,6 +9,7 @@ pub enum ResultType {
     Artist,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum Action {
     // ── User intent ──────────────────────────────────────────────
@@ -16,10 +17,16 @@ pub enum Action {
     Play(Track),
     Pause,
     Resume,
+    Stop,
     PlayPause,
     PlaySelected,
     Skip,
     SeekTo(Duration),
+    SeekForward(Duration),
+    SeekBackward(Duration),
+    VolumeUp,
+    VolumeDown,
+    ToggleMute,
     EnqueueTrack(Track),
     SwitchProvider(String),
     SetMode(Mode),
@@ -51,7 +58,6 @@ pub enum Action {
 
     // ── Player feedback ───────────────────────────────────────────
     PlayerEvent(PlayerEvent),
-    MpvStdout(String),
 
     // ── Plugin responses ──────────────────────────────────────────
     PluginResponse { id: String, result: PluginResult },
@@ -77,6 +83,7 @@ pub enum Action {
     Resize(u16, u16),
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Track {
     pub id: String,
@@ -93,14 +100,13 @@ pub struct Track {
     pub result_type: ResultType,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum PlayerEvent {
     TrackEnded,
-    PositionChanged {
-        position: Duration,
-        duration: Duration,
-        percent: u8,
-    },
+    TimePosChanged(Duration),
+    DurationChanged(Duration),
+    PercentChanged(u8),
     Stopped,
     MetadataLoaded {
         title: Option<String>,

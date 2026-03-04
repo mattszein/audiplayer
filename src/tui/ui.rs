@@ -3,13 +3,15 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs},
+    widgets::{
+        Block, BorderType, Borders, Clear, LineGauge, List, ListItem, ListState, Paragraph, Tabs,
+    },
 };
 use std::time::Duration;
 
 use crate::core::Mode;
 use crate::core::action::ResultType;
-use crate::core::state::{AppState, Focus, PlaybackStatus};
+use crate::core::state::{AppState, Focus, PlaybackState, PlaybackStatus};
 use crate::tui::theme::Theme;
 
 fn format_duration(d: Duration) -> String {
@@ -33,17 +35,23 @@ pub fn render(frame: &mut Frame, state: &AppState) {
     let bottom_line = if state.mode == Mode::Command {
         Line::from(vec![
             Span::styled(mode_str, theme.badge()),
-            Span::styled(format!(" :{} ", state.command_input), Style::default().fg(theme.secondary)),
+            Span::styled(
+                format!(" :{} ", state.command_input),
+                Style::default().fg(theme.secondary),
+            ),
         ])
     } else {
         let mut spans = vec![
             Span::styled(mode_str, theme.badge()),
-            Span::styled(" :k help | :q quit ", theme.muted()),
+            Span::styled(" :h help | :q quit ", theme.muted()),
         ];
 
         // Append selection info from focused panel
         let selected_track = if state.focus == Focus::NowPlaying {
-            state.now_playing.as_ref().and_then(|np| np.tracks.get(np.cursor))
+            state
+                .now_playing
+                .as_ref()
+                .and_then(|np| np.tracks.get(np.cursor))
         } else {
             let s = state.get_active_search();
             s.results.get(s.cursor)
@@ -55,7 +63,12 @@ pub fn render(frame: &mut Frame, state: &AppState) {
                 ResultType::Track => "[Enter: Play Track]",
             };
             spans.push(Span::styled(" Selection: ", theme.header()));
-            spans.push(Span::styled(&r.title, Style::default().fg(theme.default).add_modifier(Modifier::BOLD)));
+            spans.push(Span::styled(
+                &r.title,
+                Style::default()
+                    .fg(theme.default)
+                    .add_modifier(Modifier::BOLD),
+            ));
             spans.push(Span::styled(" by ", theme.muted()));
             spans.push(Span::styled(&r.artist, Style::default().fg(theme.primary)));
             if let Some(ref album) = r.album {
@@ -73,58 +86,68 @@ pub fn render(frame: &mut Frame, state: &AppState) {
         crate::tui::theme::ThemeMode::Light => "light",
     };
     let theme_label = Line::from(vec![
-        Span::styled(format!(" {} ", theme.name), Style::default().fg(theme.support)),
+        Span::styled(
+            format!(" {} ", theme.name),
+            Style::default().fg(theme.support),
+        ),
         Span::styled(format!("{} ", mode_label), theme.muted()),
-    ]).alignment(Alignment::Right);
+    ])
+    .alignment(Alignment::Right);
 
     let outer_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .style(theme.base())
-        .title_top(Line::from(vec![
-            Span::styled(" ♪ Audiplayer ", Style::default().fg(theme.default).add_modifier(Modifier::BOLD)),
-        ]).alignment(Alignment::Center))
+        .title_top(
+            Line::from(vec![Span::styled(
+                " ♪ Audiplayer ",
+                Style::default()
+                    .fg(theme.default)
+                    .add_modifier(Modifier::BOLD),
+            )])
+            .alignment(Alignment::Center),
+        )
         .title_bottom(bottom_line)
         .title_bottom(theme_label);
 
     let inner_area = outer_block.inner(area);
     frame.render_widget(outer_block, area);
 
-        let main_layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(3), // Player
-                Constraint::Min(0),    // Main Content (Search/Results)
-            ])
-            .split(inner_area);
+    let main_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(4), // Player
+            Constraint::Min(0),    // Main Content (Search/Results)
+        ])
+        .split(inner_area);
 
-        render_player(frame, main_layout[0], state);
+    render_player(frame, main_layout[0], state);
 
-        let content_area = main_layout[1];
-        let show_right = state.show_now_playing || state.show_logs;
-        if show_right {
-            let content_layout = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
-                .split(content_area);
+    let content_area = main_layout[1];
+    let show_right = state.show_now_playing || state.show_logs;
+    if show_right {
+        let content_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+            .split(content_area);
 
-            render_search(frame, content_layout[0], state);
-            if state.show_now_playing {
-                render_now_playing(frame, content_layout[1], state);
-            } else {
-                render_logs(frame, content_layout[1], state);
-            }
+        render_search(frame, content_layout[0], state);
+        if state.show_now_playing {
+            render_now_playing(frame, content_layout[1], state);
         } else {
-            render_search(frame, content_area, state);
+            render_logs(frame, content_layout[1], state);
         }
-
-        if state.show_help {
-            render_help_overlay(frame, area, state);
-        }
-        if state.show_theme_selector {
-            render_theme_selector(frame, area, state);
-        }
+    } else {
+        render_search(frame, content_area, state);
     }
+
+    if state.show_help {
+        render_help_overlay(frame, area, state);
+    }
+    if state.show_theme_selector {
+        render_theme_selector(frame, area, state);
+    }
+}
 
 fn render_breadcrumbs(frame: &mut Frame, area: Rect, state: &AppState) {
     let theme = &state.theme;
@@ -134,10 +157,7 @@ fn render_breadcrumbs(frame: &mut Frame, area: Rect, state: &AppState) {
         .iter()
         .enumerate()
         .flat_map(|(i, b)| {
-            let mut parts = vec![Span::styled(
-                format!(" {} ", b),
-                theme.selected(),
-            )];
+            let mut parts = vec![Span::styled(format!(" {} ", b), theme.selected())];
             if i < s.breadcrumbs.len() - 1 {
                 parts.push(Span::styled(" » ", theme.muted()));
             }
@@ -160,7 +180,10 @@ fn render_player(frame: &mut Frame, area: Rect, state: &AppState) {
 
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1)])
+        .constraints([
+            Constraint::Length(1), // Info & Volume
+            Constraint::Length(1), // Progress bar
+        ])
         .split(inner);
 
     let (title, artist) = match &p.track {
@@ -174,31 +197,77 @@ fn render_player(frame: &mut Frame, area: Rect, state: &AppState) {
         PlaybackStatus::Stopped => "⏹",
     };
 
-    let mut spans = vec![
-        Span::styled(
-            format!(" {} ", status_icon),
-            Style::default().fg(theme.highlight),
-        ),
-    ];
+    let mut info_spans = vec![Span::styled(
+        format!(" {} ", status_icon),
+        Style::default().fg(theme.highlight),
+    )];
     if state.autoplay_add {
-        spans.push(Span::styled(
+        info_spans.push(Span::styled(
             "[AP] ",
-            Style::default().fg(theme.secondary).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(theme.secondary)
+                .add_modifier(Modifier::BOLD),
         ));
     }
-    spans.extend([
+    info_spans.extend([
         Span::styled(title, Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" — "),
         Span::styled(artist, theme.muted()),
-        Span::raw("  "),
-        Span::styled(
-            p.last_mpv_line.as_deref().unwrap_or(""),
-            Style::default().fg(theme.secondary),
-        ),
     ]);
-    let player_line = Line::from(spans);
 
-    frame.render_widget(Paragraph::new(player_line), rows[0]);
+    if let Some(msg) = &p.status_message {
+        info_spans.push(Span::raw("  "));
+        info_spans.push(Span::styled(
+            msg,
+            Style::default().fg(theme.secondary),
+        ));
+    }
+
+    // Volume status
+    let vol_style = if p.muted {
+        Style::default()
+            .fg(Color::Red)
+            .add_modifier(Modifier::CROSSED_OUT)
+    } else {
+        Style::default().fg(Color::Yellow)
+    };
+    let vol_text = if p.muted {
+        format!(" MUTED ({}%) ", p.volume)
+    } else {
+        format!(" VOL: {}% ", p.volume)
+    };
+
+    let info_line = Line::from(info_spans);
+    let vol_line = Line::from(vec![
+        Span::styled(vol_text, vol_style),
+        Span::styled(" [ / ] ", Style::default().fg(Color::DarkGray)),
+    ]);
+
+    let info_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Min(0), Constraint::Length(20)])
+        .split(rows[0]);
+
+    frame.render_widget(Paragraph::new(info_line), info_layout[0]);
+    frame.render_widget(
+        Paragraph::new(vol_line).alignment(Alignment::Right),
+        info_layout[1],
+    );
+
+    // Progress Bar
+    let gauge = LineGauge::default()
+        .block(Block::default())
+        .filled_style(Style::default().fg(Color::Cyan).bg(Color::DarkGray))
+        .filled_symbol(ratatui::symbols::line::THICK_HORIZONTAL)
+        .ratio(p.percent as f64 / 100.0)
+        .label(format!(
+            " {} / {} ({}%) ",
+            PlaybackState::format_duration(p.position),
+            PlaybackState::format_duration(p.duration),
+            p.percent
+        ));
+
+    frame.render_widget(gauge, rows[1]);
 }
 
 fn render_search(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -296,10 +365,7 @@ fn render_results(frame: &mut Frame, area: Rect, state: &AppState) {
     let s = state.get_active_search();
 
     if s.is_loading {
-        frame.render_widget(
-            Paragraph::new("  Loading…").style(theme.muted()),
-            area,
-        );
+        frame.render_widget(Paragraph::new("  Loading…").style(theme.muted()), area);
         return;
     }
 
@@ -309,10 +375,7 @@ fn render_results(frame: &mut Frame, area: Rect, state: &AppState) {
         } else {
             "  Enter: search"
         };
-        frame.render_widget(
-            Paragraph::new(hint).style(theme.muted()),
-            area,
-        );
+        frame.render_widget(Paragraph::new(hint).style(theme.muted()), area);
         return;
     }
 
@@ -340,17 +403,35 @@ fn render_results(frame: &mut Frame, area: Rect, state: &AppState) {
     let header_style = theme.header();
     let header_line = Line::from(vec![
         Span::raw("   "),
-        Span::styled(format!("{:<width$}", "#", width = index_width), header_style),
+        Span::styled(
+            format!("{:<width$}", "#", width = index_width),
+            header_style,
+        ),
         Span::raw(" "),
-        Span::styled(format!("{:<width$}", "TITLE", width = title_max), header_style),
+        Span::styled(
+            format!("{:<width$}", "TITLE", width = title_max),
+            header_style,
+        ),
         Span::raw("  "),
-        Span::styled(format!("{:<width$}", "ARTIST / LABEL", width = artist_max), header_style),
+        Span::styled(
+            format!("{:<width$}", "ARTIST / LABEL", width = artist_max),
+            header_style,
+        ),
         Span::raw("  "),
-        Span::styled(format!("{:<width$}", "TYPE", width = type_width), header_style),
+        Span::styled(
+            format!("{:<width$}", "TYPE", width = type_width),
+            header_style,
+        ),
         Span::raw(" "),
-        Span::styled(format!("{:>width$}", "TIME", width = duration_width), header_style),
+        Span::styled(
+            format!("{:>width$}", "TIME", width = duration_width),
+            header_style,
+        ),
         Span::raw(" "),
-        Span::styled(format!("{:>width$}", "BITRATE", width = bitrate_width), header_style),
+        Span::styled(
+            format!("{:>width$}", "BITRATE", width = bitrate_width),
+            header_style,
+        ),
         Span::raw(" "),
         Span::styled("PRE", header_style),
     ]);
@@ -486,10 +567,7 @@ fn render_now_playing(frame: &mut Frame, area: Rect, state: &AppState) {
             let block = focused_block(focused, " Now Playing ".to_string(), None, theme);
             let inner = block.inner(area);
             frame.render_widget(block, area);
-            frame.render_widget(
-                Paragraph::new("  No tracks").style(theme.muted()),
-                inner,
-            );
+            frame.render_widget(Paragraph::new("  No tracks").style(theme.muted()), inner);
             return;
         }
     };
@@ -517,7 +595,10 @@ fn render_now_playing(frame: &mut Frame, area: Rect, state: &AppState) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let playing_track_id = state.playback.track.as_ref()
+    let playing_track_id = state
+        .playback
+        .track
+        .as_ref()
         .filter(|_| state.playback.status != PlaybackStatus::Stopped)
         .map(|t| t.id.as_str());
 
@@ -528,11 +609,14 @@ fn render_now_playing(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(|(i, track)| {
             let is_playing = playing_track_id == Some(track.id.as_str());
             let is_selected = focused && i == np.cursor;
-            let prefix = if is_playing { "♫ " } else if is_selected { "▶ " } else { "  " };
-            let duration_str = track
-                .duration
-                .map(format_duration)
-                .unwrap_or_default();
+            let prefix = if is_playing {
+                "♫ "
+            } else if is_selected {
+                "▶ "
+            } else {
+                "  "
+            };
+            let duration_str = track.duration.map(format_duration).unwrap_or_default();
             let text = format!("{}{}.  {}  {}", prefix, i + 1, track.title, duration_str);
 
             let style = if is_playing {
@@ -626,6 +710,10 @@ fn render_help_overlay(frame: &mut Frame, area: Rect, state: &AppState) {
         Line::from(""),
         Line::from("   Enter         Play / view album"),
         Line::from("   Space         Play / Pause"),
+        Line::from("   Shift+S       Stop playback"),
+        Line::from("   [ / ]         Volume Down / Up"),
+        Line::from("   m             Toggle Mute"),
+        Line::from("   , / .         Seek Backward / Forward (5s)"),
         Line::from(""),
         Line::from(Span::styled(" Modes", theme.header())),
         Line::from(""),
@@ -650,7 +738,7 @@ fn render_help_overlay(frame: &mut Frame, area: Rect, state: &AppState) {
         Line::from(""),
         Line::from("   :q / :quit    Quit / close panel"),
         Line::from("   :l / :log     Toggle log panel"),
-        Line::from("   :k / :help    Toggle this help"),
+        Line::from("   :h / :help    Toggle this help"),
         Line::from("   :t / :theme   Theme selector"),
         Line::from("   :dm / :mode   Toggle dark/light"),
         Line::from(""),
@@ -704,7 +792,11 @@ fn render_theme_selector(frame: &mut Frame, area: Rect, state: &AppState) {
             } else {
                 Style::default()
             };
-            ListItem::new(Line::from(Span::styled(format!("{}{}", prefix, name), style))).style(bg)
+            ListItem::new(Line::from(Span::styled(
+                format!("{}{}", prefix, name),
+                style,
+            )))
+            .style(bg)
         })
         .collect();
 
@@ -713,7 +805,12 @@ fn render_theme_selector(frame: &mut Frame, area: Rect, state: &AppState) {
     frame.render_stateful_widget(List::new(items), inner, &mut list_state);
 }
 
-fn focused_block<'a>(focused: bool, title: String, bottom_title: Option<Line<'a>>, theme: &Theme) -> Block<'a> {
+fn focused_block<'a>(
+    focused: bool,
+    title: String,
+    bottom_title: Option<Line<'a>>,
+    theme: &Theme,
+) -> Block<'a> {
     let style = if focused {
         theme.border_focused()
     } else {

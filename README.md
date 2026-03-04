@@ -28,6 +28,10 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
 | `Enter` | Normal | Play track / View album tracks |
 | `Backspace` | Normal | Go back (e.g., from album to search) |
 | `Space` | Normal | Play/Pause toggle |
+| `Shift+S` | Normal | Stop playback |
+| `[` / `]` | Normal | Volume Down / Up |
+| `m` | Normal | Toggle Mute |
+| `,` / `.` | Normal | Seek Backward / Forward (5s) |
 | `j` / `k` / arrows | Normal | Navigate results |
 | `gg` / `G` | Normal | Jump to first / last result |
 | `Tab` / `Shift+Tab` | Normal | Cycle providers |
@@ -40,7 +44,7 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
 | `Shift+H` / `Shift+L` | Normal | Navigate queue history |
 | `:q` | Command | Quit (or close focused panel) |
 | `:l` | Command | Toggle log panel |
-| `:k` / `:help` | Command | Toggle help overlay |
+| `:h` / `:help` | Command | Toggle help overlay |
 | `:t` / `:theme` | Command | Open theme selector |
 | `:dm` / `:mode` | Command | Toggle dark/light mode |
 | `Ctrl+c` | Any | Force quit |
@@ -62,11 +66,11 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
   - Concurrency control via Semaphores to prevent rate-limiting (429 errors).
 - **Audio Engine**:
   - Uses a persistent `mpv` instance controlled via IPC sockets.
-  - Real-time progress monitoring via stdout/stderr capture.
+  - Real-time progress monitoring via IPC property observation.
 - **Robust Logging**: Split-screen log view (`:l`) for real-time error tracking without TUI corruption.
 - **High Quality**: Explicitly prioritizes the highest bitrate audio streams available.
 - **Theme System**: 9 built-in themes (default, gruvbox, tokyo-night, rose-pine, catppuccin, everforest, kanagawa, nord, magenta) with dark/light mode support. Interactive theme selector with live preview (`:t`).
-- **Help Overlay**: Floating keybinding reference (`:k`) with two-column layout and scroll support.
+- **Help Overlay**: Floating keybinding reference (`:h`) with two-column layout and scroll support.
 
 ## Directory Structure
 
@@ -99,11 +103,12 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
 
 ### Playback
 
-- [ ] Volume control
-- [ ] Seek forward / backward within a track
+- [x] Volume control
+- [x] Seek forward / backward within a track
+- [x] Add progressbar in track player view.
 - [x] Play an album entirely (auto-advance through tracks)
 - [x] "Now Playing" view — show the current context (queue, album, or single track)
-- [ ] System notifications on track change
+- [x] System notifications on track change
 
 ### Queues & Persistence
 
@@ -115,7 +120,7 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
 ### UI
 
 - [x] Move Selection items to main bottom panel
-- [x] Remove keys from the bottom panel and add a help menu (`:help :keys or :k`) with all
+- [x] Remove keys from the bottom panel and add a help menu (`:help :keys or :h`) with all
 keybindings
 - [x] Theme support (primary, secondary colors, with dark/light modes)
 

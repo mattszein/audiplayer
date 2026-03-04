@@ -2,13 +2,12 @@ pub mod traits;
 pub mod bandcamp;
 pub mod youtube;
 
-use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc::Sender, Semaphore};
 
-pub use traits::{Provider, Capability};
+pub use traits::Provider;
 pub use bandcamp::BandcampProvider;
 pub use youtube::YouTubeProvider;
 use crate::core::action::{Action, PluginResult, Track};
@@ -187,23 +186,22 @@ impl PluginManager {
 fn parse_duration(s: &str) -> Option<Duration> {
     if s == "NA" || s.is_empty() { return None; }
     let parts: Vec<&str> = s.split(':').collect();
-    let mut secs = 0u64;
-    match parts.len() {
+    let secs = match parts.len() {
         3 => {
             let h = parts[0].parse::<u64>().ok()?;
             let m = parts[1].parse::<u64>().ok()?;
             let s = parts[2].parse::<u64>().ok()?;
-            secs = h * 3600 + m * 60 + s;
+            h * 3600 + m * 60 + s
         }
         2 => {
             let m = parts[0].parse::<u64>().ok()?;
             let s = parts[1].parse::<u64>().ok()?;
-            secs = m * 60 + s;
+            m * 60 + s
         }
         1 => {
-            secs = parts[0].parse::<u64>().ok()?;
+            parts[0].parse::<u64>().ok()?
         }
         _ => return None,
-    }
+    };
     Some(Duration::from_secs(secs))
 }

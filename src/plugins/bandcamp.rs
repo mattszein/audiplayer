@@ -3,12 +3,13 @@ use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::core::action::{Track, ResultType};
-use crate::plugins::traits::{Capability, Provider};
+use crate::plugins::traits::Provider;
 
 pub struct BandcampProvider {
     client: reqwest::Client,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct BandcampResult {
     #[serde(rename = "type")]
@@ -33,6 +34,7 @@ struct TralbumDetails {
     tracks: Option<Vec<BandcampTrack>>,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct BandcampTrack {
     track_id: i64,
@@ -61,10 +63,6 @@ impl BandcampProvider {
 
 #[async_trait]
 impl Provider for BandcampProvider {
-    fn id(&self) -> &str { "bandcamp" }
-    fn display_name(&self) -> &str { "Bandcamp" }
-    fn capabilities(&self) -> Vec<Capability> { vec![Capability::Search] }
-
     async fn search(&self, query: &str, _limit: usize) -> Result<Vec<Track>> {
         let (filter, search_query) = if query.starts_with("@") {
             let parts: Vec<&str> = query.splitn(2, ' ').collect();

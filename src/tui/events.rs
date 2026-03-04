@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyEvent};
+use crossterm::event::{self, Event};
 use tokio::sync::mpsc::Sender;
 
 use crate::core::action::Action;
