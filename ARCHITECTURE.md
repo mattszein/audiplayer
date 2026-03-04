@@ -61,8 +61,13 @@ Every major subsystem (`player`, `plugins`, `tui` events) runs in its own task o
   - `events.rs`: A dedicated blocking thread that reads `crossterm` events and maps them to `Action::Key`.
   - `ui.rs`:
     - **Pure Rendering**: Takes a reference to `AppState` and draws the screen.
-    - **Dynamic Layouts**: Adjusts the layout when logs are toggled and injects contextual selection info directly into panel borders.
+    - **Dynamic Layouts**: Adjusts the layout when logs are toggled and injects contextual selection info into the bottom bar.
     - **Visual Feedback**: Highlights the currently playing track in the active search results.
+    - **Overlays**: Floating help panel (`:k`) and theme selector (`:t`) rendered on top of content.
+  - `theme.rs`:
+    - **Palette System**: Each theme defines accent and text colors for both dark and light modes via a `Palette` struct.
+    - **9 Presets**: default, gruvbox, tokyo-night, rose-pine, catppuccin, everforest, kanagawa, nord, magenta.
+    - **Convenience Methods**: `Theme` provides `base()`, `selected()`, `badge()`, `header()`, `muted()`, etc. so `ui.rs` never uses inline colors.
 
 ---
 

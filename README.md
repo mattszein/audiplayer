@@ -32,9 +32,17 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
 | `gg` / `G` | Normal | Jump to first / last result |
 | `Tab` / `Shift+Tab` | Normal | Cycle providers |
 | `1` / `2` | Normal | Switch to Bandcamp / YouTube directly |
-| `Ctrl+h` / `Ctrl+l` | Normal | Focus search / logs panel |
-| `:q` | Command | Quit (or close logs if focused) |
+| `Ctrl+h` / `Ctrl+l` | Normal | Focus search / right panel |
+| `a` / `r` | Normal | Add / replace queue with selected track |
+| `A` / `R` | Normal | Add / replace queue with all results |
+| `e` | Normal | Toggle Now Playing panel |
+| `p` | Normal | Toggle auto-play on add |
+| `Shift+H` / `Shift+L` | Normal | Navigate queue history |
+| `:q` | Command | Quit (or close focused panel) |
 | `:l` | Command | Toggle log panel |
+| `:k` / `:help` | Command | Toggle help overlay |
+| `:t` / `:theme` | Command | Open theme selector |
+| `:dm` / `:mode` | Command | Toggle dark/light mode |
 | `Ctrl+c` | Any | Force quit |
 
 ## Features
@@ -57,6 +65,8 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
   - Real-time progress monitoring via stdout/stderr capture.
 - **Robust Logging**: Split-screen log view (`:l`) for real-time error tracking without TUI corruption.
 - **High Quality**: Explicitly prioritizes the highest bitrate audio streams available.
+- **Theme System**: 9 built-in themes (default, gruvbox, tokyo-night, rose-pine, catppuccin, everforest, kanagawa, nord, magenta) with dark/light mode support. Interactive theme selector with live preview (`:t`).
+- **Help Overlay**: Floating keybinding reference (`:k`) with two-column layout and scroll support.
 
 ## Directory Structure
 
@@ -75,6 +85,7 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
 - `src/tui/`: Terminal User Interface.
   - `ui.rs`: Pure functional rendering logic.
   - `events.rs`: Blocking input listener thread.
+  - `theme.rs`: Theme system with palettes, dark/light modes, and 9 presets.
 
 ## Roadmap
 
@@ -103,10 +114,10 @@ Audiplayer is a provider-agnostic music player TUI that decouples the user inter
 
 ### UI
 
-- [ ] Move Selection items to main bottom panel
-- [ ] Remove keys from the bottom panel and add a help menu (`:help :keys or :k`) with all
+- [x] Move Selection items to main bottom panel
+- [x] Remove keys from the bottom panel and add a help menu (`:help :keys or :k`) with all
 keybindings
-- [ ] Theme support (primary, secondary colors, with dark/light modes)
+- [x] Theme support (primary, secondary colors, with dark/light modes)
 
 ## License
 

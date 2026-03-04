@@ -9,6 +9,7 @@ use crate::core::{
     Mode,
 };
 use crate::tui::Tui;
+use crate::tui::theme::{Theme, ThemeMode};
 use crate::player::{Player, mpv::MpvPlayer};
 use crate::plugins::PluginManager;
 
@@ -89,6 +90,15 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
                     state.show_logs = !state.show_logs;
                     if state.show_logs { state.focus = Focus::Logs; }
                     else if state.focus == Focus::Logs { state.focus = Focus::Search; }
+                }
+                "theme" | "t" => {
+                    handle_action(Action::OpenThemeSelector, state, player, plugins);
+                }
+                "mode" | "dm" => {
+                    handle_action(Action::CycleThemeMode, state, player, plugins);
+                }
+                "help" | "keys" | "k" => {
+                    handle_action(Action::ToggleHelp, state, player, plugins);
                 }
                 _ => { state.logs.push(format!("Unknown command: {}", cmd)); }
             }
@@ -350,6 +360,25 @@ fn handle_action(action: Action, state: &mut AppState, player: &Arc<MpvPlayer>, 
             }
         }
 
+        Action::OpenThemeSelector => {
+            let names = Theme::preset_names();
+            let idx = names.iter().position(|&n| n == state.theme.name).unwrap_or(0);
+            state.theme_selector_cursor = idx;
+            state.theme_before_selector = Some(state.theme.name.to_string());
+            state.show_theme_selector = true;
+        }
+        Action::CycleThemeMode => {
+            let new_mode = match state.theme.mode {
+                ThemeMode::Dark => ThemeMode::Light,
+                ThemeMode::Light => ThemeMode::Dark,
+            };
+            state.theme = state.theme.with_mode(new_mode);
+        }
+        Action::ToggleHelp => {
+            state.show_help = !state.show_help;
+            state.help_scroll = 0;
+        }
+
         Action::MpvStdout(line) => state.playback.last_mpv_line = Some(line),
         Action::PlayerEvent(event) => match event {
             PlayerEvent::TrackEnded => {
@@ -488,6 +517,39 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState, player: &Arc<MpvPlayer>
     let last_key = state.last_key.take();
 
     match state.mode {
+        Mode::Normal if state.show_theme_selector => {
+            let names = Theme::preset_names();
+            match key.code {
+                KeyCode::Char('j') | KeyCode::Down => {
+                    state.theme_selector_cursor = (state.theme_selector_cursor + 1) % names.len();
+                    state.theme = Theme::from_name(names[state.theme_selector_cursor], state.theme.mode);
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    state.theme_selector_cursor = (state.theme_selector_cursor + names.len() - 1) % names.len();
+                    state.theme = Theme::from_name(names[state.theme_selector_cursor], state.theme.mode);
+                }
+                KeyCode::Enter => {
+                    state.show_theme_selector = false;
+                    state.theme_before_selector = None;
+                }
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    if let Some(ref original) = state.theme_before_selector {
+                        state.theme = Theme::from_name(original, state.theme.mode);
+                    }
+                    state.show_theme_selector = false;
+                    state.theme_before_selector = None;
+                }
+                _ => {}
+            }
+        }
+        Mode::Normal if state.show_help => {
+            match key.code {
+                KeyCode::Char('j') | KeyCode::Down => { state.help_scroll = state.help_scroll.saturating_add(1); }
+                KeyCode::Char('k') | KeyCode::Up => { state.help_scroll = state.help_scroll.saturating_sub(1); }
+                KeyCode::Char('q') | KeyCode::Esc => { state.show_help = false; }
+                _ => {}
+            }
+        }
         Mode::Normal => match (key.modifiers, key.code) {
                 (KeyModifiers::NONE, KeyCode::Char(':')) => {
                     state.mode = Mode::Command;
@@ -600,10 +662,6 @@ fn handle_key_event(key: KeyEvent, state: &mut AppState, player: &Arc<MpvPlayer>
 
                 (KeyModifiers::NONE, KeyCode::Char('q')) if state.focus == Focus::Logs => {
                     state.show_logs = false;
-                    state.focus = Focus::Search;
-                }
-                (KeyModifiers::NONE, KeyCode::Char('q')) if state.focus == Focus::NowPlaying => {
-                    state.show_now_playing = false;
                     state.focus = Focus::Search;
                 }
 
