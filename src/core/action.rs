@@ -56,6 +56,16 @@ pub enum Action {
     // ── Plugin responses ──────────────────────────────────────────
     PluginResponse { id: String, result: PluginResult },
 
+    // ── Now Playing ──────────────────────────────────────────────
+    ToggleNowPlaying,
+    NowPlayingAdd,         // Add selected track to now playing
+    NowPlayingReplace,     // Replace now playing with selected track
+    NowPlayingAddAll,      // Add all search results to now playing
+    NowPlayingReplaceAll,  // Replace now playing with all search results
+    NowPlayingBack,
+    NowPlayingForward,
+    ToggleAutoplayAdd,
+
     // ── App lifecycle ─────────────────────────────────────────────
     Quit,
     Tick,
