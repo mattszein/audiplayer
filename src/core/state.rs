@@ -2,7 +2,8 @@ use std::time::Duration;
 use std::collections::{HashSet, HashMap};
 use crate::core::action::Track;
 use crate::core::Mode;
-use crate::tui::theme::Theme;
+use crate::core::settings::Settings;
+use crate::tui::theme::{Theme, ThemeMode};
 use crossterm::event::KeyEvent;
 
 /// Which panel currently has keyboard focus.
@@ -114,15 +115,21 @@ pub struct AppState {
     pub show_theme_selector: bool,
     pub theme_selector_cursor: usize,
     pub theme_before_selector: Option<String>,
+    pub status_message: Option<String>,
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub fn new(settings: &Settings) -> Self {
         let providers = vec!["bandcamp".to_string(), "youtube".to_string()];
         let mut search_states = HashMap::new();
         for p in &providers {
             search_states.insert(p.clone(), SearchState::new());
         }
+
+        let theme_mode = match settings.theme.mode.as_str() {
+            "light" => ThemeMode::Light,
+            _ => ThemeMode::Dark,
+        };
 
         Self {
             focus: Focus::Search,
@@ -133,13 +140,13 @@ impl AppState {
                 position: Duration::from_secs(0),
                 duration: Duration::from_secs(0),
                 percent: 0,
-                volume: 100,
+                volume: settings.playback.volume,
                 muted: false,
                 track: None,
                 status_message: None,
             },
             search_states,
-            active_provider: "bandcamp".to_string(),
+            active_provider: settings.providers.default.clone(),
             providers,
             show_logs: false,
             logs: Vec::new(),
@@ -147,14 +154,15 @@ impl AppState {
             now_playing_history: Vec::new(),
             now_playing_future: Vec::new(),
             show_now_playing: false,
-            autoplay_add: true,
+            autoplay_add: settings.playback.autoplay,
             last_key: None,
-            theme: Theme::default_theme(),
+            theme: Theme::from_name(&settings.theme.name, theme_mode),
             show_help: false,
             help_scroll: 0,
             show_theme_selector: bool::default(),
             theme_selector_cursor: usize::default(),
             theme_before_selector: None,
+            status_message: None,
         }
     }
 

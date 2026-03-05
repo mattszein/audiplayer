@@ -4,6 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::core::Mode;
 use crate::core::action::Action;
+use crate::core::settings::Settings;
 use crate::core::state::Focus;
 use crate::tui::theme::Theme;
 
@@ -41,6 +42,12 @@ fn execute_command(ctx: &mut Ctx) -> bool {
             super::ui::handle(Action::ToggleHelp, ctx);
             false
         }
+        "config" => {
+            let msg = Settings::ensure_config_file();
+            super::ui::handle_log(msg.clone(), ctx.state);
+            ctx.state.status_message = Some(msg);
+            false
+        }
         _ => {
             ctx.state.logs.push(format!("Unknown command: {}", cmd));
             false
@@ -54,6 +61,7 @@ use super::Ctx;
 use super::search::preload_selected_track;
 
 pub fn handle_key_event(key: KeyEvent, ctx: &mut Ctx) -> bool {
+    ctx.state.status_message = None;
     let last_key = ctx.state.last_key.take();
 
     match ctx.state.mode {

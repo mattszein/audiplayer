@@ -40,6 +40,11 @@ pub fn render(frame: &mut Frame, state: &AppState) {
                 Style::default().fg(theme.secondary),
             ),
         ])
+    } else if let Some(ref msg) = state.status_message {
+        Line::from(vec![
+            Span::styled(mode_str, theme.badge()),
+            Span::styled(format!(" {} ", msg), Style::default().fg(theme.secondary)),
+        ])
     } else {
         let mut spans = vec![
             Span::styled(mode_str, theme.badge()),
@@ -741,6 +746,7 @@ fn render_help_overlay(frame: &mut Frame, area: Rect, state: &AppState) {
         Line::from("   :h / :help    Toggle this help"),
         Line::from("   :t / :theme   Theme selector"),
         Line::from("   :dm / :mode   Toggle dark/light"),
+        Line::from("   :config       Show/create config file"),
         Line::from(""),
         Line::from(""),
         Line::from(Span::styled(" Press q or Esc to close", theme.muted())),
