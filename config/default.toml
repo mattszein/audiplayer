@@ -1,0 +1,13 @@
+[theme]
+name = "default"
+mode = "dark"
+
+[playback]
+volume = 100
+autoplay = true
+
+[providers]
+default = "bandcamp"
+
+[general]
+log_file = "audiplayer.log"

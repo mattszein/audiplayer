@@ -741,6 +741,7 @@ fn render_help_overlay(frame: &mut Frame, area: Rect, state: &AppState) {
         Line::from("   :h / :help    Toggle this help"),
         Line::from("   :t / :theme   Theme selector"),
         Line::from("   :dm / :mode   Toggle dark/light"),
+        Line::from("   :config       Show/create config file"),
         Line::from(""),
         Line::from(""),
         Line::from(Span::styled(" Press q or Esc to close", theme.muted())),

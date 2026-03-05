@@ -4,6 +4,7 @@ mod player;
 mod plugins;
 
 use anyhow::Result;
+use core::settings::Settings;
 use core::state::AppState;
 use tokio::sync::mpsc;
 use tui::Tui;
@@ -14,8 +15,11 @@ use std::os::unix::io::AsRawFd;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // 0. Load settings (defaults + user overrides)
+    let settings = Settings::new()?;
+
     // Redirect stderr to a file to prevent corrupting the TUI
-    let log_file = File::create("audiplayer.log")?;
+    let log_file = File::create(&settings.general.log_file)?;
     let fd = log_file.as_raw_fd();
     unsafe {
         libc::dup2(fd, libc::STDERR_FILENO);
@@ -29,7 +33,7 @@ async fn main() -> Result<()> {
     let plugins = PluginManager::new(action_tx.clone());
 
     // 3. Initial application state
-    let state = AppState::new();
+    let state = AppState::new(&settings);
 
     // 4. Terminal UI (owns the terminal, sends Actions on input)
     let tui = Tui::new(action_tx.clone())?;

@@ -1,0 +1,16 @@
+# Audiplayer settings
+# Uncomment and modify values to override defaults.
+
+# [theme]
+# name = "default"  # options: default, gruvbox, tokyo-night, rose-pine, catppuccin, everforest, kanagawa, nord, magenta
+# mode = "dark"     # "dark" or "light"
+
+# [playback]
+# volume = 100      # 0-100
+# autoplay = true   # auto-play when adding to queue
+
+# [providers]
+# default = "bandcamp"  # initial provider: bandcamp, youtube
+
+# [general]
+# log_file = "audiplayer.log"

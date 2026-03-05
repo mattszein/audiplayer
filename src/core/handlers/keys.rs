@@ -41,6 +41,10 @@ fn execute_command(ctx: &mut Ctx) -> bool {
             super::ui::handle(Action::ToggleHelp, ctx);
             false
         }
+        "config" => {
+            super::ui::handle(Action::OpenConfig, ctx);
+            false
+        }
         _ => {
             ctx.state.logs.push(format!("Unknown command: {}", cmd));
             false
