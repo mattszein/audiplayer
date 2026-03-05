@@ -115,6 +115,7 @@ pub struct AppState {
     pub show_theme_selector: bool,
     pub theme_selector_cursor: usize,
     pub theme_before_selector: Option<String>,
+    pub status_message: Option<String>,
 }
 
 impl AppState {
@@ -161,6 +162,7 @@ impl AppState {
             show_theme_selector: bool::default(),
             theme_selector_cursor: usize::default(),
             theme_before_selector: None,
+            status_message: None,
         }
     }
 

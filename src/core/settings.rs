@@ -1,7 +1,7 @@
 use config::{Config, ConfigError, File, FileFormat};
 use serde::Deserialize;
 
-const DEFAULT_CONFIG: &str = include_str!("../../config/default.toml");
+const DEFAULT_CONFIG: &str = project_file!("config/default.toml");
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ThemeSettings {
@@ -48,7 +48,29 @@ impl Settings {
         config.try_deserialize()
     }
 
-    pub fn config_path() -> Option<std::path::PathBuf> {
+    pub fn ensure_config_file() -> String {
+        let Some(path) = Self::config_path() else {
+            return "Could not determine config directory".to_string();
+        };
+
+        if path.exists() {
+            return format!("Config: {}", path.display());
+        }
+
+        if let Some(parent) = path.parent() {
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                return format!("Failed to create config dir: {}", e);
+            }
+        }
+
+        let example = project_file!("config/example.toml");
+        match std::fs::write(&path, example) {
+            Ok(()) => format!("Created config: {}", path.display()),
+            Err(e) => format!("Failed to create config file: {}", e),
+        }
+    }
+
+    fn config_path() -> Option<std::path::PathBuf> {
         dirs::config_dir().map(|p| p.join("audiplayer").join("settings.toml"))
     }
 

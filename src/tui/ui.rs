@@ -40,6 +40,11 @@ pub fn render(frame: &mut Frame, state: &AppState) {
                 Style::default().fg(theme.secondary),
             ),
         ])
+    } else if let Some(ref msg) = state.status_message {
+        Line::from(vec![
+            Span::styled(mode_str, theme.badge()),
+            Span::styled(format!(" {} ", msg), Style::default().fg(theme.secondary)),
+        ])
     } else {
         let mut spans = vec![
             Span::styled(mode_str, theme.badge()),

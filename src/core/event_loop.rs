@@ -126,7 +126,7 @@ fn handle_action(
         }
 
         // UI
-        Action::OpenThemeSelector | Action::CycleThemeMode | Action::ToggleHelp | Action::OpenConfig => {
+        Action::OpenThemeSelector | Action::CycleThemeMode | Action::ToggleHelp => {
             return handlers::ui::handle(action, ctx);
         }
 

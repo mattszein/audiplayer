@@ -76,7 +76,6 @@ pub enum Action {
     OpenThemeSelector,
     CycleThemeMode,
     ToggleHelp,
-    OpenConfig,
 
     // ── App lifecycle ─────────────────────────────────────────────
     Quit,
